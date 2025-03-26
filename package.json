@@ -1,0 +1,21 @@
+{
+  "name": "@laranatech/doorana",
+  "version": "1.0.0",
+  "description": "Doom run on Larana",
+  "license": "MIT",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vite": "^6.2.3"
+  },
+  "dependencies": {
+    "@laranatech/colorana": "^1.0.0",
+    "@laranatech/lareq": "^1.1.5"
+  }
+}

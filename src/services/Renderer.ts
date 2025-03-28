@@ -90,64 +90,99 @@ export class Renderer {
             }
         }
         
-        // Рендеринг спрайтов
-        sprites.forEach(sprite => {
-            // Позиция спрайта относительно камеры
-            const relativePosition = new Vector3(
-                sprite.position.x - camera.getPosition().x,
-                sprite.position.y - camera.getPosition().y,
-                sprite.position.z - camera.getPosition().z
-            )
+        // Подготавливаем спрайты для рендеринга
+        const preparedSprites = sprites.map(sprite => {
+            // Получаем позицию спрайта относительно камеры
+            const playerX = camera.getPosition().x;
+            const playerY = camera.getPosition().z; // z в нашей системе это y в 2D
+            const spriteX = sprite.position.x;
+            const spriteY = sprite.position.z; // z в нашей системе это y в 2D
             
-            // Проверяем, находится ли спрайт спереди камеры
-            const rotatedPos = relativePosition.rotateY(-camera.getRotation())
-            if (rotatedPos.z <= 0) return // Не рендерим спрайты позади камеры
+            // Вычисляем дистанцию до спрайта (по прямой)
+            const dx = spriteX - playerX;
+            const dy = spriteY - playerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            console.log(distance)
             
-            // Проецируем центр спрайта
-            const projected = camera.projectPoint(sprite.position)
+            // Преобразуем угол к спрайту относительно абсолютной системы координат
+            let spriteAngle = Math.atan2(-dy, -dx); // Угол в абсолютной системе
+            console.log('camera', camera.getRotation() * 180 / Math.PI)
+            console.log('spriteAngle', spriteAngle * 180 / Math.PI)
             
-            // Вычисляем размер спрайта на экране
-            const distance = Math.sqrt(
-                relativePosition.x * relativePosition.x + 
-                relativePosition.z * relativePosition.z
-            )
+            // Нормализуем угол относительно направления взгляда игрока
+            // Необходимо учесть, что в нашей системе 0 градусов это направление по оси Z
+            let relativeAngle = camera.getRotation() - spriteAngle;
+            console.log('relativeAngle', relativeAngle * 180 / Math.PI)
             
-            const spriteHeight = (height / distance) * this.WALL_HEIGHT * 1.5 // Немного больше, чем стены
-            const spriteWidth = spriteHeight * 0.8 // Соотношение сторон для спрайта
+            // Нормализуем угол в пределах от -Pi до Pi
+            while (relativeAngle < -Math.PI) relativeAngle += 2 * Math.PI;
+            while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
             
-            const spriteScreenX = width / 2 + projected.x * width / 2
-            const spriteScreenY = height / 2 - projected.y * height / 2
+            return {
+                ...sprite,
+                distance,
+                angle: relativeAngle,
+                visible: Math.abs(relativeAngle) < fov / 2 + 0.2 // Добавляем небольшой запас
+            };
+        }).filter(sprite => sprite.visible).sort((a, b) => b.distance - a.distance);
+        
+        // Рендерим спрайты от дальних к ближним
+        preparedSprites.forEach(sprite => {
+            // Размер спрайта пропорционален расстоянию
+            const spriteSize = (height / sprite.distance) * this.WALL_HEIGHT * 1.5;
+            const spriteWidth = spriteSize * 0.8;
+            const spriteHeight = spriteSize;
             
-            // Определяем видим ли спрайт (не загорожен ли стеной)
-            const spriteLeftX = Math.max(0, Math.floor((spriteScreenX - spriteWidth / 2) * this.RAY_COUNT / width))
-            const spriteRightX = Math.min(this.RAY_COUNT - 1, Math.floor((spriteScreenX + spriteWidth / 2) * this.RAY_COUNT / width))
+            // Вычисляем экранную позицию спрайта
+            // В DOOM позиция спрайта вычисляется на основе его углового положения
+            // относительно поля зрения игрока
+            const angleToFov = sprite.angle / fov; // отношение угла к полю зрения
+            const spriteX = width * (0.5 - angleToFov);
+            const spriteY = height / 2; // Всегда центрируем по вертикали
             
-            let isVisible = false
-            for (let i = spriteLeftX; i <= spriteRightX; i++) {
-                if (distance < zBuffer[i]) {
-                    isVisible = true
-                    break
+            // Определяем колонки экрана, которые занимает спрайт
+            const leftCol = Math.max(0, Math.floor((spriteX - spriteWidth / 2) * this.RAY_COUNT / width));
+            const rightCol = Math.min(this.RAY_COUNT - 1, Math.floor((spriteX + spriteWidth / 2) * this.RAY_COUNT / width));
+            
+            // Проверяем, не загорожен ли спрайт стенами
+            let visibleColumns = 0;
+            for (let i = leftCol; i <= rightCol; i++) {
+                if (sprite.distance < zBuffer[i]) {
+                    visibleColumns++;
                 }
             }
             
-            if (isVisible) {
-                // Установка цвета для спрайта
-                lareq.command.setCtx({
-                    fillStyle: '#AA2200'
-                })
-                
-                lareq.command.beginPath()
-                lareq.command.moveTo({ x: spriteScreenX - spriteWidth / 2, y: spriteScreenY - spriteHeight / 2 })
-                lareq.command.lineTo({ x: spriteScreenX + spriteWidth / 2, y: spriteScreenY - spriteHeight / 2 })
-                lareq.command.lineTo({ x: spriteScreenX + spriteWidth / 2, y: spriteScreenY + spriteHeight / 2 })
-                lareq.command.lineTo({ x: spriteScreenX - spriteWidth / 2, y: spriteScreenY + spriteHeight / 2 })
-                lareq.command.closePath()
-                lareq.command.fill()
-            }
-        })
+            // Если видно менее 3 колонок, не рисуем спрайт
+            if (visibleColumns < 3) return;
+            
+            // Рисуем спрайт
+            lareq.command.setCtx({
+                fillStyle: this.getSpriteColor(sprite.texture)
+            });
+            
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: spriteX - spriteWidth / 2, y: spriteY - spriteHeight / 2 });
+            lareq.command.lineTo({ x: spriteX + spriteWidth / 2, y: spriteY - spriteHeight / 2 });
+            lareq.command.lineTo({ x: spriteX + spriteWidth / 2, y: spriteY + spriteHeight / 2 });
+            lareq.command.lineTo({ x: spriteX - spriteWidth / 2, y: spriteY + spriteHeight / 2 });
+            lareq.command.closePath();
+            lareq.command.fill();
+        });
         
-        this.renderer.prepare(lareq.commands)
-        this.renderer.render(lareq.commands)
+        this.renderer.prepare(lareq.commands);
+        this.renderer.render(lareq.commands);
+    }
+    
+    // Выбираем цвет для спрайта в зависимости от его типа
+    private getSpriteColor(texture: string): string {
+        switch (texture) {
+            case 'enemy': return '#AA2200'; // Красный для врагов
+            case 'health': return '#00AA00'; // Зеленый для здоровья
+            case 'ammo': return '#0000AA'; // Синий для боеприпасов
+            case 'weapon': return '#AAAA00'; // Желтый для оружия
+            case 'key': return '#AA00AA'; // Фиолетовый для ключей
+            default: return '#AAAAAA'; // Серый для всего остального
+        }
     }
     
     private castRay(camera: Camera, map: Map, angle: number, maxDepth: number = 24): { distance: number, hitWall: boolean } {

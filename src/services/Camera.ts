@@ -19,6 +19,11 @@ export class Camera {
 
     rotate(angle: number) {
         this.rotation += angle * this.rotateSpeed;
+        if (this.rotation > Math.PI) {
+            this.rotation -= Math.PI;
+        } else if (this.rotation < -Math.PI) {
+            this.rotation += Math.PI;
+        }
     }
 
     moveForward() {

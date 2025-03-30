@@ -20,9 +20,9 @@ export class Camera {
     rotate(angle: number) {
         this.rotation += angle * this.rotateSpeed;
         if (this.rotation > Math.PI) {
-            this.rotation -= Math.PI;
+            this.rotation -= Math.PI * 2;
         } else if (this.rotation < -Math.PI) {
-            this.rotation += Math.PI;
+            this.rotation += Math.PI * 2;
         }
     }
 

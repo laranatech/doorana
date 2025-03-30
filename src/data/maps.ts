@@ -12,12 +12,12 @@ const level =
 const levelTest = 
 `
 ############
-#  #       #
-#     P#   #
+#          #
+# P    #   #
 #      #   #
-#  W   #   #
+# W        #
 #          #
 ############
 `
 
-export default level
+export default levelTest

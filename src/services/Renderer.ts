@@ -4,16 +4,41 @@ import { Camera } from './Camera'
 import { Vector3 } from './Vector3'
 import { Map } from './Map'
 
+// Создаем интерфейс для расширенного спрайта
+interface PreparedSprite {
+    position: Vector3;
+    texture: string;
+    distance: number;
+    correctedDistance: number;
+    angle: number;
+    rotatedX: number;
+    rotatedZ: number;
+    visible: boolean;
+}
+
 export class Renderer {
     private renderer: CanvasRenderer
     private readonly RAY_COUNT: number
     private readonly WALL_HEIGHT: number
     private readonly MAX_DEPTH: number = 24 // Максимальная видимая дистанция
+    private debugEnabled: boolean = false // Флаг для включения/выключения отладки
     
     constructor(renderer: CanvasRenderer, rayCount: number = 480, wallHeight: number = 1) {
         this.renderer = renderer
         this.RAY_COUNT = rayCount
         this.WALL_HEIGHT = wallHeight
+    }
+    
+    // Включить/выключить отладочный режим
+    toggleDebug(enabled: boolean = true) {
+        this.debugEnabled = enabled;
+    }
+    
+    // Функция для вывода отладочной информации
+    private debug(...args: any[]) {
+        if (this.debugEnabled) {
+            console.log('[Renderer Debug]', ...args);
+        }
     }
     
     render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = []) {
@@ -45,7 +70,7 @@ export class Renderer {
             const t = i / floorGradientSteps;
             const yStart = height/2 + t * (height/2);
             const yEnd = height/2 + (t + 1/floorGradientSteps) * (height/2);
-            const brightness = 1 - t;
+            const brightness = 1 * (t + 0.4);
             const floorColor = this.applyBrightness('#686868', brightness);
             
             lareq.command.setCtx({
@@ -78,7 +103,7 @@ export class Renderer {
             const t = i / ceilingGradientSteps;
             const yStart = t * (height/2);
             const yEnd = (t + 1/ceilingGradientSteps) * (height/2);
-            const brightness = 0.6 + 0.4 * t;
+            const brightness = 1 - 0.7 * t;
             const ceilingColor = this.applyBrightness('#414141', brightness);
             
             lareq.command.setCtx({
@@ -182,6 +207,33 @@ export class Renderer {
             // Расстояние до спрайта
             const distance = Math.sqrt(dx * dx + dz * dz);
             
+            // Отладочная информация
+            this.debug(`Sprite at world position: (${sprite.position.x}, ${sprite.position.z})`);
+            this.debug(`Player position: (${playerPos.x}, ${playerPos.z}), Angle: ${playerAngle}`);
+            this.debug(`Delta: (${dx}, ${dz}), Distance: ${distance}`);
+            
+            // Проверка, не находится ли спрайт слишком близко
+            if (distance <= 0.1) {
+                return {
+                    ...sprite,
+                    distance,
+                    correctedDistance: Infinity,
+                    angle: 0,
+                    rotatedX: 0,
+                    rotatedZ: 0,
+                    visible: false
+                } as PreparedSprite;
+            }
+            
+            // Нам нужны координаты спрайта относительно направления взгляда камеры
+            // Выполняем матричное преобразование для поворота координат вокруг оси Y (вертикальной)
+            const cosAngle = Math.cos(-playerAngle);
+            const sinAngle = Math.sin(-playerAngle);
+            
+            // Поворачиваем точку вокруг оси Y
+            const rotatedX = dx * cosAngle - dz * sinAngle;
+            const rotatedZ = dx * sinAngle + dz * cosAngle;
+            
             // Вычисляем угол до спрайта в мировом пространстве
             // Math.atan2 даёт угол от отрицательной оси Y по часовой стрелке
             // в нашей системе координат ось Z вперед, X вправо
@@ -194,15 +246,20 @@ export class Renderer {
             while (relativeAngle < -Math.PI) relativeAngle += 2 * Math.PI;
             while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
             
-            // Проверка, не находится ли спрайт сзади или слишком близко
-            if (dz <= 0.1) {
+            this.debug(`Sprite angle: ${spriteAngle}, Relative angle: ${relativeAngle}`);
+            this.debug(`Rotated coordinates: (${rotatedX}, ${rotatedZ})`);
+            
+            // Проверяем, находится ли спрайт перед игроком
+            if (rotatedZ <= 0) {
                 return {
                     ...sprite,
                     distance,
                     correctedDistance: Infinity,
                     angle: relativeAngle,
+                    rotatedX,
+                    rotatedZ,
                     visible: false
-                };
+                } as PreparedSprite;
             }
             
             return {
@@ -210,9 +267,11 @@ export class Renderer {
                 distance,
                 correctedDistance: distance * Math.cos(relativeAngle), // Корректируем расстояние как для стен
                 angle: relativeAngle,
+                rotatedX,
+                rotatedZ,
                 // Спрайт видим, если он в поле зрения с небольшим запасом
                 visible: Math.abs(relativeAngle) < fov / 2 + 0.2
-            };
+            } as PreparedSprite;
         }).filter(sprite => sprite.visible).sort((a, b) => b.distance - a.distance);
         
         // Рендерим спрайты от дальних к ближним
@@ -222,11 +281,19 @@ export class Renderer {
             const spriteWidth = spriteSize * 0.3;
             const spriteHeight = spriteSize;
             
-            // Вычисляем экранную позицию спрайта
-            // Используем корректное вычисление аспектного отношения с учетом FOV
-            const angleToFov = sprite.angle / fov;
-            const spriteX = width * (0.5 - angleToFov);
+            // Вычисляем экранную позицию спрайта используя повернутые координаты
+            // Преобразуем трехмерные координаты в экранные координаты
+            // RotatedX определяет горизонтальное смещение от центра экрана
+            // RotatedZ определяет глубину, которая влияет на масштаб
+            
+            // Проекция X в экранные координаты
+            // Используем функцию проекции: screen_x = (width/2) * (1 + rotatedX / (rotatedZ * tan(fov/2)))
+            const halfFov = fov / 2;
+            const spriteX = width / 2 * (1 + sprite.rotatedX / (sprite.rotatedZ * Math.tan(halfFov)));
             const spriteY = height / 2; // Всегда центрируем по вертикали
+            
+            // Отладочная информация о позиции спрайта на экране
+            this.debug(`Sprite screen position: x=${spriteX}, y=${spriteY}, width=${spriteWidth}, height=${spriteHeight}`);
             
             // Определяем колонки экрана, которые занимает спрайт
             const leftCol = Math.max(0, Math.floor((spriteX - spriteWidth / 2) * this.RAY_COUNT / width));

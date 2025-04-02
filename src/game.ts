@@ -59,24 +59,29 @@ export class Game {
 	}
 
 	handleInput(key: string) {
-		switch (key) {
-			case 'ArrowLeft':
+		switch (key.toLowerCase()) {
+			case 'arrowleft':
 				this.camera.rotate(-1)
 				break
-			case 'ArrowRight':
+			case 'arrowright':
 				this.camera.rotate(1)
 				break
-			case 'w':
+			case 'w': case 'ц':
 				this.camera.moveForward()
 				break
-			case 's':
+			case 's': case 'ы':
 				this.camera.moveBackward()
 				break
-			case 'a':
+			case 'a': case 'ф':
 				this.camera.moveLeft()
 				break
-			case 'd':
+			case 'd': case 'в':
 				this.camera.moveRight()
+				break
+			// Добавляем управление отладкой - клавиша D включает/выключает отладку
+			case 'o':
+				this.gameRenderer.toggleDebug()
+				console.log('Отладка спрайтов включена')
 				break
 		}
 		this.update()

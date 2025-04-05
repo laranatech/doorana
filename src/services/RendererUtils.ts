@@ -11,20 +11,19 @@ export class RendererUtils {
     let ray = new Vector3(0, 0, 0)
     let distance = 0
     const step = 0.01 // Уменьшаем шаг для более точного определения столкновений
-    
+    const cameraX = camera.getPosition().x
+    const cameraZ = camera.getPosition().z
+
     while (distance < this.MAX_DEPTH) {
         ray = new Vector3(
             Math.sin(angle) * distance,
             0,
             Math.cos(angle) * distance
         )
-        const worldPos = new Vector3(
-            camera.getPosition().x + ray.x,
-            camera.getPosition().y + ray.y,
-            camera.getPosition().z + ray.z
-        )
-        const coordX = Math.floor(worldPos.x)
-        const coordZ = Math.floor(worldPos.z)
+        const worldPosX = cameraX + ray.x
+        const worldPosZ = cameraZ + ray.z
+        const coordX = Math.floor(worldPosX)
+        const coordZ = Math.floor(worldPosZ)
         
         if (map.isTransparentWall(coordX, coordZ)) {
             const doorOffset = doorAnimationService.getDoorOffset(coordX, coordZ)
@@ -40,12 +39,12 @@ export class RendererUtils {
             }
             
             // Если дверь частично открыта, проверяем, проходит ли луч через щель
-            const xOffset = worldPos.x - coordX
-            const zOffset = worldPos.z - coordZ
+            const xOffset = worldPosX - coordX
+            const zOffset = worldPosZ - coordZ
             
             // Определяем, с какой стороны мы подходим к двери
-            const isHorizontalWall = Math.abs(xOffset) < doorOffset
-            const isVerticalWall = Math.abs(zOffset) < doorOffset
+            const isHorizontalWall = Math.abs(worldPosX - cameraX) < Math.abs(worldPosZ - cameraZ)
+            const isVerticalWall = !isHorizontalWall
             
             if (isHorizontalWall) {
                 // Для горизонтальных стен проверяем смещение по X

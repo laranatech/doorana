@@ -3,8 +3,9 @@ import { RenderCommand, RenderQueue } from '@laranatech/lareq'
 import { Camera } from './Camera'
 import { Vector3 } from './Vector3'
 import { Map } from './Map'
+import { RendererUtils } from './RendererUtils'
+import { RendererDoomPanel } from './RendererDoomPanel'
 
-// Создаем интерфейс для расширенного спрайта
 interface PreparedSprite {
     position: Vector3;
     texture: string;
@@ -16,13 +17,25 @@ interface PreparedSprite {
     visible: boolean;
 }
 
+const invisibleSprite: PreparedSprite = {
+    position: new Vector3(0, 0, 0),
+    texture: '',
+    distance: 0,
+    correctedDistance: 0,
+    angle: 0,
+    rotatedX: 0,
+    rotatedZ: 0,
+    visible: false
+}
+
 export class Renderer {
     private renderer: CanvasRenderer
     private readonly RAY_COUNT: number
     private readonly WALL_HEIGHT: number
-    private readonly MAX_DEPTH: number = 24 // Максимальная видимая дистанция
     private debugEnabled: boolean = false // Флаг для включения/выключения отладки
-    
+    private utils: RendererUtils = new RendererUtils()
+    private doomPanel: RendererDoomPanel = new RendererDoomPanel()
+
     constructor(renderer: CanvasRenderer, rayCount: number = 480, wallHeight: number = 1) {
         this.renderer = renderer
         this.RAY_COUNT = rayCount
@@ -42,9 +55,6 @@ export class Renderer {
     }
     
     render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '', playerHealth: number = 100, ammo: number = 50) {
-        this.renderer.canvas!.width = window.innerWidth
-        this.renderer.canvas!.height = window.innerHeight
-        
         const lareq = new RenderQueue()
         const width = this.renderer.canvas!.width
         const height = this.renderer.canvas!.height
@@ -55,72 +65,9 @@ export class Renderer {
         // Определим высоту нижней панели
         const panelHeight = 60;
         const viewportHeight = height - panelHeight;
-        
-        // Рисуем пол с градиентным эффектом (имитация)
-        lareq.command.setCtx({
-            fillStyle: '#4A4A4A' // Обновлённый тёмно-серый цвет пола в стиле DOOM
-        })
-        lareq.command.beginPath()
-        lareq.command.moveTo({ x: 0, y: viewportHeight/2 })
-        lareq.command.lineTo({ x: width, y: viewportHeight/2 })
-        lareq.command.lineTo({ x: width, y: viewportHeight })
-        lareq.command.lineTo({ x: 0, y: viewportHeight })
-        lareq.command.closePath()
-        lareq.command.fill()
-        
-        // Добавляем эффект градиента к полу с помощью прямоугольников разного оттенка
-        const floorGradientSteps = 8;
-        for (let i = 0; i < floorGradientSteps; i++) {
-            const t = i / floorGradientSteps;
-            const yStart = viewportHeight/2 + t * (viewportHeight/2);
-            const yEnd = viewportHeight/2 + (t + 1/floorGradientSteps) * (viewportHeight/2);
-            const brightness = 1 * (t + 0.4);
-            const floorColor = this.applyBrightness('#4A4A4A', brightness);
-            
-            lareq.command.setCtx({
-                fillStyle: floorColor
-            })
-            lareq.command.beginPath()
-            lareq.command.moveTo({ x: 0, y: yStart })
-            lareq.command.lineTo({ x: width, y: yStart })
-            lareq.command.lineTo({ x: width, y: yEnd })
-            lareq.command.lineTo({ x: 0, y: yEnd })
-            lareq.command.closePath()
-            lareq.command.fill()
-        }
-        
-        // Рисуем потолок с градиентом
-        lareq.command.setCtx({
-            fillStyle: '#222222' // Обновлённый тёмный цвет потолка в стиле DOOM
-        })
-        lareq.command.beginPath()
-        lareq.command.moveTo({ x: 0, y: 0 })
-        lareq.command.lineTo({ x: width, y: 0 })
-        lareq.command.lineTo({ x: width, y: viewportHeight/2 })
-        lareq.command.lineTo({ x: 0, y: viewportHeight/2 })
-        lareq.command.closePath()
-        lareq.command.fill()
-        
-        // Добавляем эффект градиента к потолку с помощью прямоугольников разного оттенка
-        const ceilingGradientSteps = 8;
-        for (let i = 0; i < ceilingGradientSteps; i++) {
-            const t = i / ceilingGradientSteps;
-            const yStart = t * (viewportHeight/2);
-            const yEnd = (t + 1/ceilingGradientSteps) * (viewportHeight/2);
-            const brightness = 1 - 0.7 * t;
-            const ceilingColor = this.applyBrightness('#222222', brightness);
-            
-            lareq.command.setCtx({
-                fillStyle: ceilingColor
-            })
-            lareq.command.beginPath()
-            lareq.command.moveTo({ x: 0, y: yStart })
-            lareq.command.lineTo({ x: width, y: yStart })
-            lareq.command.lineTo({ x: width, y: yEnd })
-            lareq.command.lineTo({ x: 0, y: yEnd })
-            lareq.command.closePath()
-            lareq.command.fill()
-        }
+
+        this.renderFloor(lareq, width, height, panelHeight)
+        this.renderCeiling(lareq, width, height, panelHeight)
         
         // Массив для хранения расстояний до стен для каждого луча
         // Нам это понадобится для правильного рендеринга спрайтов
@@ -130,10 +77,31 @@ export class Renderer {
         const rayStep = fov / this.RAY_COUNT
         const startAngle = camera.getRotation() - fov / 2
         
+        this.renderWalls(lareq, width, viewportHeight, camera, map, zBuffer)
+
+        this.renderSprites(lareq, width, viewportHeight, sprites, camera, zBuffer)
+        
+        // Отображаем сообщение, если оно есть
+        if (message) {
+            this.renderMessage(lareq, width, viewportHeight, message)
+        }
+        
+        // Рисуем нижнюю панель в стиле DOOM
+        this.doomPanel.drawDoomPanel(lareq, width, height, viewportHeight, playerHealth, ammo);
+        
+        this.renderer.prepare(lareq.commands);
+        this.renderer.render(lareq.commands);
+    }
+
+    renderWalls(lareq: RenderQueue, width: number, height: number, camera: Camera, map: Map, zBuffer: number[]) {
+        const fov = Math.PI / 3
+        const rayStep = fov / this.RAY_COUNT
+        const startAngle = camera.getRotation() - fov / 2
+        
         // Рендеринг стен с повышенной точностью
         for (let i = 0; i < this.RAY_COUNT; i++) {
             const rayAngle = startAngle + rayStep * i
-            const { distance, hitWall } = this.castRay(camera, map, rayAngle)
+            const { distance, hitWall } = this.utils.castRay(camera, map, rayAngle)
             
             // Сохраняем расстояние в Z-буфере
             zBuffer[i] = hitWall ? distance : Infinity
@@ -142,12 +110,12 @@ export class Renderer {
                 // Вычисляем высоту стены с учетом эффекта "рыбий глаз"
                 // Корректируем проекцию, чтобы избавиться от искажения "рыбий глаз"
                 const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
-                const wallHeight = (viewportHeight / correctedDistance) * this.WALL_HEIGHT
-                const wallTop = (viewportHeight - wallHeight) / 2
+                const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
+                const wallTop = (height - wallHeight) / 2
                 const wallBottom = wallTop + wallHeight
                 
                 // Применяем эффект тумана/затемнения с расстоянием
-                const brightness = this.calculateBrightness(correctedDistance);
+                const brightness = this.utils.calculateBrightness(correctedDistance);
                 
                 // Добавляем псевдотекстуру стены с помощью эффекта смены оттенков
                 // в зависимости от позиции на стене
@@ -188,7 +156,7 @@ export class Renderer {
                     }
                 }
                 
-                wallColor = this.applyBrightness(baseWallColor, brightness);
+                wallColor = this.utils.applyBrightness(baseWallColor, brightness);
                 
                 // Рисуем стену
                 lareq.command.setCtx({
@@ -203,10 +171,92 @@ export class Renderer {
                 lareq.command.fill()
             }
         }
+    }
 
+    renderFloor(lareq: RenderQueue, width: number, height: number, panelHeight: number) {
+        const viewportHeight = height - panelHeight;
+        
+        // Рисуем пол с градиентным эффектом (имитация)
+        lareq.command.setCtx({
+            fillStyle: '#4A4A4A' // Обновлённый тёмно-серый цвет пола в стиле DOOM
+        })
+        
+        // Добавляем эффект градиента к полу с помощью прямоугольников разного оттенка
+        const floorGradientSteps = 8;
+        for (let i = 0; i < floorGradientSteps; i++) {
+            const t = i / floorGradientSteps;
+            const yStart = viewportHeight/2 + t * (viewportHeight/2);
+            const yEnd = viewportHeight/2 + (t + 1/floorGradientSteps) * (viewportHeight/2);
+            const brightness = 1 * (t + 0.4);
+            const floorColor = this.utils.applyBrightness('#4A4A4A', brightness);
+            
+            lareq.command.setCtx({
+                fillStyle: floorColor
+            })
+            lareq.command.beginPath()
+            lareq.command.moveTo({ x: 0, y: yStart })
+            lareq.command.lineTo({ x: width, y: yStart })
+            lareq.command.lineTo({ x: width, y: yEnd })
+            lareq.command.lineTo({ x: 0, y: yEnd })
+            lareq.command.closePath()
+            lareq.command.fill()
+        }
+    }
+
+    renderCeiling(lareq: RenderQueue, width: number, height: number, panelHeight: number) {
+        const viewportHeight = height - panelHeight;
+        
+        // Рисуем потолок с градиентом
+        lareq.command.setCtx({
+            fillStyle: '#222222' // Обновлённый тёмный цвет потолка в стиле DOOM
+        })
+        
+        // Добавляем эффект градиента к потолку с помощью прямоугольников разного оттенка
+        const ceilingGradientSteps = 8;
+        for (let i = 0; i < ceilingGradientSteps; i++) {
+            const t = i / ceilingGradientSteps;
+            const yStart = t * (viewportHeight/2);
+            const yEnd = (t + 1/ceilingGradientSteps) * (viewportHeight/2);
+            const brightness = 1 - 0.7 * t;
+            const ceilingColor = this.utils.applyBrightness('#222222', brightness);
+            
+            lareq.command.setCtx({
+                fillStyle: ceilingColor
+            })
+            lareq.command.beginPath()
+            lareq.command.moveTo({ x: 0, y: yStart })
+            lareq.command.lineTo({ x: width, y: yStart })
+            lareq.command.lineTo({ x: width, y: yEnd })
+            lareq.command.lineTo({ x: 0, y: yEnd })
+            lareq.command.closePath()
+            lareq.command.fill()
+        }
+    }
+
+    renderMessage(lareq: RenderQueue, width: number, height: number, message: string) {
+        const messageX = width / 2;
+        const messageY = height - 50; // Внизу экрана с отступом
+        
+        lareq.command.setCtx({
+            font: '30px Arial',
+            fillStyle: '#FFFFFF',
+            textAlign: 'center',
+            textBaseline: 'middle'
+        });
+        
+        lareq.command.fillText({
+            text: message,
+            x: messageX,
+            y: messageY,
+            maxWidth: width * 0.8 // Максимальная ширина текста
+        });
+    }
+
+    renderSprites(lareq: RenderQueue, width: number, height: number, sprites: {position: Vector3, texture: string}[], camera: Camera, zBuffer: number[]) {
         // Координаты игрока и спрайта в мировом пространстве
         const playerPos = camera.getPosition();
         const playerAngle = camera.getRotation();
+        const fov = Math.PI / 3;
         
         // Подготавливаем спрайты для рендеринга
         const preparedSprites = sprites.map(sprite => {
@@ -221,15 +271,7 @@ export class Renderer {
             
             // Проверка, не находится ли спрайт слишком близко
             if (distance <= 0.1) {
-                return {
-                    ...sprite,
-                    distance,
-                    correctedDistance: Infinity,
-                    angle: 0,
-                    rotatedX: 0,
-                    rotatedZ: 0,
-                    visible: false
-                } as PreparedSprite;
+                return invisibleSprite;
             }
             
             // Нам нужны координаты спрайта относительно направления взгляда камеры
@@ -255,15 +297,11 @@ export class Renderer {
             
             // Проверяем, находится ли спрайт перед игроком
             if (rotatedZ <= 0) {
-                return {
-                    ...sprite,
-                    distance,
-                    correctedDistance: Infinity,
-                    angle: spriteAngle,
-                    rotatedX,
-                    rotatedZ,
-                    visible: false
-                } as PreparedSprite;
+                return invisibleSprite;
+            }
+
+            if (Math.abs(relativeAngle) > fov / 2 + 0.2) {
+                return invisibleSprite;
             }
             
             return {
@@ -274,7 +312,7 @@ export class Renderer {
                 rotatedX,
                 rotatedZ,
                 // Спрайт видим, если он в поле зрения с небольшим запасом
-                visible: Math.abs(relativeAngle) < fov / 2 + 0.2
+                visible: true
             } as PreparedSprite;
         }).filter(sprite => sprite.visible).sort((a, b) => b.distance - a.distance);
         
@@ -315,8 +353,8 @@ export class Renderer {
             if (visibleColumns === 0) return;
             
             // Применяем эффект тумана/затемнения к спрайту
-            const brightness = this.calculateBrightness(sprite.correctedDistance);
-            const spriteColor = this.applyBrightness(this.getSpriteColor(sprite.texture), brightness);
+            const brightness = this.utils.calculateBrightness(sprite.correctedDistance);
+            const spriteColor = this.utils.applyBrightness(this.utils.getSpriteColor(sprite.texture), brightness);
             
             // Устанавливаем цвет для спрайта с учетом расстояния
             lareq.command.setCtx({
@@ -345,345 +383,5 @@ export class Renderer {
                 lareq.command.fill();
             }
         });
-        
-        // Отображаем сообщение, если оно есть
-        if (message) {
-            const messageX = width / 2;
-            const messageY = viewportHeight - 50; // Внизу экрана с отступом
-            
-            lareq.command.setCtx({
-                font: '20px Arial',
-                fillStyle: '#FFFFFF',
-                textAlign: 'center',
-                textBaseline: 'middle'
-            });
-            
-            lareq.command.fillText({
-                text: message,
-                x: messageX,
-                y: messageY,
-                maxWidth: width * 0.8 // Максимальная ширина текста
-            });
-        }
-        
-        // Рисуем нижнюю панель в стиле DOOM
-        this.drawDoomPanel(lareq, width, height, viewportHeight, playerHealth, ammo);
-        
-        this.renderer.prepare(lareq.commands);
-        this.renderer.render(lareq.commands);
-    }
-    
-    // Метод для отрисовки нижней панели в стиле DOOM
-    private drawDoomPanel(lareq: RenderQueue, width: number, height: number, viewportHeight: number, playerHealth: number, ammo: number) {
-        // Фон для нижней панели
-        lareq.command.setCtx({
-            fillStyle: '#2C2C2C'
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: 0, y: viewportHeight });
-        lareq.command.lineTo({ x: width, y: viewportHeight });
-        lareq.command.lineTo({ x: width, y: height });
-        lareq.command.lineTo({ x: 0, y: height });
-        lareq.command.closePath();
-        lareq.command.fill();
-        
-        // Рамка лица в стиле DOOM
-        const faceSize = 50;
-        const faceX = width / 2 - faceSize / 2;
-        const faceY = viewportHeight + 5;
-        
-        // Рамка для лица
-        lareq.command.setCtx({
-            fillStyle: '#3A3A3A',
-            strokeStyle: '#777777',
-            lineWidth: 2
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: faceX, y: faceY });
-        lareq.command.lineTo({ x: faceX + faceSize, y: faceY });
-        lareq.command.lineTo({ x: faceX + faceSize, y: faceY + faceSize });
-        lareq.command.lineTo({ x: faceX, y: faceY + faceSize });
-        lareq.command.closePath();
-        lareq.command.fill();
-        lareq.command.stroke();
-        
-        // Рисуем лицо (упрощенно - используем прямоугольники и линии)
-        lareq.command.setCtx({
-            fillStyle: '#FFC0CB', // Розовый цвет кожи
-            strokeStyle: '#000000'
-        });
-        
-        // Простое выражение лица в зависимости от здоровья
-        if (playerHealth > 60) {
-            // Счастливое лицо
-            // Глаза (прямоугольники)
-            lareq.command.setCtx({
-                fillStyle: '#000000'
-            });
-            // Левый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Правый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Улыбка (квадратная)
-            lareq.command.setCtx({
-                strokeStyle: '#000000',
-                lineWidth: 2
-            });
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 32 });
-            lareq.command.lineTo({ x: faceX + 17, y: faceY + 38 });
-            lareq.command.lineTo({ x: faceX + 33, y: faceY + 38 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 32 });
-            lareq.command.stroke();
-        } else if (playerHealth > 20) {
-            // Нейтральное лицо
-            // Глаза (прямоугольники)
-            lareq.command.setCtx({
-                fillStyle: '#000000'
-            });
-            // Левый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Правый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Прямой рот
-            lareq.command.setCtx({
-                strokeStyle: '#000000',
-                lineWidth: 2
-            });
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 35 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 35 });
-            lareq.command.stroke();
-        } else {
-            // Грустное лицо
-            // Глаза (прямоугольники)
-            lareq.command.setCtx({
-                fillStyle: '#000000'
-            });
-            // Левый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Правый глаз
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
-            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
-            lareq.command.closePath();
-            lareq.command.fill();
-            
-            // Грустный рот (перевернутая дуга)
-            lareq.command.setCtx({
-                strokeStyle: '#000000',
-                lineWidth: 2
-            });
-            lareq.command.beginPath();
-            lareq.command.moveTo({ x: faceX + 15, y: faceY + 35 });
-            lareq.command.lineTo({ x: faceX + 20, y: faceY + 30 });
-            lareq.command.lineTo({ x: faceX + 30, y: faceY + 30 });
-            lareq.command.lineTo({ x: faceX + 35, y: faceY + 35 });
-            lareq.command.stroke();
-        }
-        
-        // Полоса здоровья
-        const healthBarWidth = width / 3;
-        const healthBarHeight = 20;
-        const healthBarX = faceX - healthBarWidth - 10;
-        const healthBarY = viewportHeight + 20;
-        
-        // Фон полосы здоровья
-        lareq.command.setCtx({
-            fillStyle: '#3A3A3A',
-            strokeStyle: '#777777',
-            lineWidth: 2
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: healthBarX, y: healthBarY });
-        lareq.command.lineTo({ x: healthBarX + healthBarWidth, y: healthBarY });
-        lareq.command.lineTo({ x: healthBarX + healthBarWidth, y: healthBarY + healthBarHeight });
-        lareq.command.lineTo({ x: healthBarX, y: healthBarY + healthBarHeight });
-        lareq.command.closePath();
-        lareq.command.fill();
-        lareq.command.stroke();
-        
-        // Полоса здоровья
-        const healthPercent = playerHealth / 100;
-        const healthFillWidth = healthBarWidth * healthPercent;
-        
-        // Цвет зависит от количества здоровья
-        let healthColor;
-        if (playerHealth > 60) healthColor = '#00FF00'; // Зеленый
-        else if (playerHealth > 30) healthColor = '#FFFF00'; // Желтый
-        else healthColor = '#FF0000'; // Красный
-        
-        lareq.command.setCtx({
-            fillStyle: healthColor
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: healthBarX, y: healthBarY });
-        lareq.command.lineTo({ x: healthBarX + healthFillWidth, y: healthBarY });
-        lareq.command.lineTo({ x: healthBarX + healthFillWidth, y: healthBarY + healthBarHeight });
-        lareq.command.lineTo({ x: healthBarX, y: healthBarY + healthBarHeight });
-        lareq.command.closePath();
-        lareq.command.fill();
-        
-        // Текст "HEALTH"
-        lareq.command.setCtx({
-            font: '14px Arial',
-            fillStyle: '#FFFFFF',
-            textAlign: 'center',
-            textBaseline: 'middle'
-        });
-        lareq.command.fillText({
-            text: `ЗДОРОВЬЕ ${playerHealth}%`,
-            x: healthBarX + healthBarWidth / 2,
-            y: healthBarY + healthBarHeight / 2,
-            maxWidth: healthBarWidth
-        });
-        
-        // Полоса боеприпасов
-        const ammoBarWidth = width / 3;
-        const ammoBarHeight = 20;
-        const ammoBarX = faceX + faceSize + 10;
-        const ammoBarY = viewportHeight + 20;
-        
-        // Фон полосы боеприпасов
-        lareq.command.setCtx({
-            fillStyle: '#3A3A3A',
-            strokeStyle: '#777777',
-            lineWidth: 2
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: ammoBarX, y: ammoBarY });
-        lareq.command.lineTo({ x: ammoBarX + ammoBarWidth, y: ammoBarY });
-        lareq.command.lineTo({ x: ammoBarX + ammoBarWidth, y: ammoBarY + ammoBarHeight });
-        lareq.command.lineTo({ x: ammoBarX, y: ammoBarY + ammoBarHeight });
-        lareq.command.closePath();
-        lareq.command.fill();
-        lareq.command.stroke();
-        
-        // Полоса боеприпасов
-        const maxAmmo = 100; // Максимум боеприпасов
-        const ammoPercent = ammo / maxAmmo;
-        const ammoFillWidth = ammoBarWidth * ammoPercent;
-        
-        lareq.command.setCtx({
-            fillStyle: '#3D629A' // Синий для боеприпасов
-        });
-        lareq.command.beginPath();
-        lareq.command.moveTo({ x: ammoBarX, y: ammoBarY });
-        lareq.command.lineTo({ x: ammoBarX + ammoFillWidth, y: ammoBarY });
-        lareq.command.lineTo({ x: ammoBarX + ammoFillWidth, y: ammoBarY + ammoBarHeight });
-        lareq.command.lineTo({ x: ammoBarX, y: ammoBarY + ammoBarHeight });
-        lareq.command.closePath();
-        lareq.command.fill();
-        
-        // Текст "AMMO"
-        lareq.command.setCtx({
-            font: '14px Arial',
-            fillStyle: '#FFFFFF',
-            textAlign: 'center',
-            textBaseline: 'middle'
-        });
-        lareq.command.fillText({
-            text: `ПАТРОНЫ ${ammo}`,
-            x: ammoBarX + ammoBarWidth / 2,
-            y: ammoBarY + ammoBarHeight / 2,
-            maxWidth: ammoBarWidth
-        });
-    }
-    
-    // Расчет яркости в зависимости от дистанции
-    private calculateBrightness(distance: number): number {
-        // Линейное затухание с расстоянием
-        return Math.max(0.1, Math.min(1, 1 - (distance / this.MAX_DEPTH * 0.9)));
-    }
-    
-    // Применение яркости к цвету в формате HEX
-    private applyBrightness(hexColor: string, brightness: number): string {
-        // Преобразуем цвет из HEX в RGB
-        const r = parseInt(hexColor.slice(1, 3), 16);
-        const g = parseInt(hexColor.slice(3, 5), 16);
-        const b = parseInt(hexColor.slice(5, 7), 16);
-        
-        // Затемняем цвет в зависимости от расстояния
-        const darkenedR = Math.floor(r * brightness);
-        const darkenedG = Math.floor(g * brightness);
-        const darkenedB = Math.floor(b * brightness);
-        
-        // Преобразуем обратно в HEX
-        return `#${darkenedR.toString(16).padStart(2, '0')}${darkenedG.toString(16).padStart(2, '0')}${darkenedB.toString(16).padStart(2, '0')}`;
-    }
-    
-    // Выбираем цвет для спрайта в зависимости от его типа
-    private getSpriteColor(texture: string): string {
-        switch (texture) {
-            case 'enemy': return '#BE2126'; // Красный для врагов
-            case 'health': return '#2FBA3D'; // Зеленый для здоровья
-            case 'ammo': return '#3D629A'; // Синий для боеприпасов
-            case 'weapon': return '#D9A648'; // Желтый для оружия
-            case 'key': return '#D355BA'; // Фиолетовый для ключей
-            case 'door': return '#8B572A'; // Коричневый для дверей
-            default: return '#B0B0B0'; // Серый для всего остального
-        }
-    }
-    
-    private castRay(camera: Camera, map: Map, angle: number, maxDepth: number = 24): { distance: number, hitWall: boolean } {
-        let ray = new Vector3(0, 0, 0)
-        let distance = 0
-        const step = 0.01 // Уменьшаем шаг для более точного определения столкновений
-        
-        while (distance < maxDepth) {
-            ray = new Vector3(
-                Math.sin(angle) * distance,
-                0,
-                Math.cos(angle) * distance
-            )
-            const worldPos = new Vector3(
-                camera.getPosition().x + ray.x,
-                camera.getPosition().y + ray.y,
-                camera.getPosition().z + ray.z
-            )
-            
-            if (map.isWall(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
-                return { distance, hitWall: true }
-            }
-            distance += step
-        }
-        return { distance: maxDepth, hitWall: false }
     }
 } 

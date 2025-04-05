@@ -25,7 +25,7 @@ export class Game {
 	lastTime: number = 0
 	keysPressed: Set<string> = new Set()
 	enemyAIService: EnemyAIService
-
+	damageThrottle: boolean = true
 	constructor(renderer: CanvasRenderer) {
 		this.renderer = renderer
 		
@@ -164,6 +164,17 @@ export class Game {
 					this.spriteManager.removeSprite(nearbyItem)
 					this.showMessageOnScreen('Подобрано оружие')
 					break
+			}
+		}
+
+		const nearbyEnemy = this.spriteManager.findSpriteNear(playerPos, 0.7, 'enemy')
+		if (nearbyEnemy) {
+			if (this.damageThrottle) {
+				this.takeDamage(10)
+				this.damageThrottle = false
+				setTimeout(() => {
+					this.damageThrottle = true
+				}, 300)
 			}
 		}
 	}

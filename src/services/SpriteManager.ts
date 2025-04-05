@@ -24,11 +24,15 @@ export class SpriteManager {
     }
     
     // Найти спрайт рядом с позицией
-    findSpriteNear(position: Vector3, maxDistance: number = 1): Sprite | null {
+    findSpriteNear(position: Vector3, maxDistance: number = 1, type: 'enemy' | 'item' | 'decoration' | null = null): Sprite | null {
         let closestSprite: Sprite | null = null;
         let minDistance = maxDistance;
         
         for (const sprite of this.sprites) {
+            if (type && sprite.type !== type) {
+                continue;
+            }
+
             const distance = Math.sqrt(
                 Math.pow(sprite.position.x + 0.5 - position.x, 2) +
                 Math.pow(sprite.position.z + 0.5 - position.z, 2)

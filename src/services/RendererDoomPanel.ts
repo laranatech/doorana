@@ -40,6 +40,13 @@ export class RendererDoomPanel {
         fillStyle: '#FFC0CB', // Розовый цвет кожи
         strokeStyle: '#000000'
     });
+    lareq.command.beginPath();
+    lareq.command.moveTo({ x: faceX, y: faceY });
+    lareq.command.lineTo({ x: faceX + faceSize, y: faceY });
+    lareq.command.lineTo({ x: faceX + faceSize, y: faceY + faceSize });
+    lareq.command.lineTo({ x: faceX, y: faceY + faceSize });
+    lareq.command.closePath();
+    lareq.command.fill();
     
     // Простое выражение лица в зависимости от здоровья
     if (playerHealth > 60) {
@@ -174,7 +181,7 @@ export class RendererDoomPanel {
     
     // Цвет зависит от количества здоровья
     let healthColor;
-    if (playerHealth > 60) healthColor = '#00FF00'; // Зеленый
+    if (playerHealth > 60) healthColor = '#007F00'; // Зеленый
     else if (playerHealth > 30) healthColor = '#FFFF00'; // Желтый
     else healthColor = '#FF0000'; // Красный
     
@@ -191,7 +198,7 @@ export class RendererDoomPanel {
     
     // Текст "HEALTH"
     lareq.command.setCtx({
-        font: '14px Arial',
+        font: '20px Arial',
         fillStyle: '#FFFFFF',
         textAlign: 'center',
         textBaseline: 'middle'
@@ -242,7 +249,7 @@ export class RendererDoomPanel {
     
     // Текст "AMMO"
     lareq.command.setCtx({
-        font: '14px Arial',
+        font: '20px Arial',
         fillStyle: '#FFFFFF',
         textAlign: 'center',
         textBaseline: 'middle'

@@ -15,7 +15,7 @@
     "vite": "^6.2.3"
   },
   "dependencies": {
-    "@laranatech/colorana": "^1.0.0",
+    "@laranatech/colorana": "^1.0.1",
     "@laranatech/lareq": "^1.1.5"
   }
 }

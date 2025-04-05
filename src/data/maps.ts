@@ -20,4 +20,15 @@ const levelTest =
 ############
 `
 
-export default levelTest
+const fullTest = 
+`
+#################
+#    #     #    #
+# P  # #   #    #
+#      #   #    #
+### K  #        #
+#      #   #    #
+#################
+`
+
+export default fullTest

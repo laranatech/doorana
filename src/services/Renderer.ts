@@ -177,20 +177,6 @@ export class Renderer {
                 lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
                 lareq.command.closePath()
                 lareq.command.fill()
-                
-                // // Добавляем эффект швов между кирпичами
-                // if (Math.floor(wallTop + i % 15) % 5 === 0) {
-                //     lareq.command.setCtx({
-                //         fillStyle: this.applyBrightness('#222222', brightness * 0.6)
-                //     })
-                //     lareq.command.beginPath()
-                //     lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
-                //     lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
-                //     lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
-                //     lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
-                //     lareq.command.closePath()
-                //     lareq.command.fill()
-                // }
             }
         }
 
@@ -200,11 +186,8 @@ export class Renderer {
         
         // Подготавливаем спрайты для рендеринга
         const preparedSprites = sprites.map(sprite => {
-            // Вычисляем вектор от игрока к спрайту в мировом пространстве
             const dx = sprite.position.x - playerPos.x;
             const dz = sprite.position.z - playerPos.z;
-            
-            // Расстояние до спрайта
             const distance = Math.sqrt(dx * dx + dz * dz);
             
             // Отладочная информация
@@ -227,10 +210,9 @@ export class Renderer {
             
             // Нам нужны координаты спрайта относительно направления взгляда камеры
             // Выполняем матричное преобразование для поворота координат вокруг оси Y (вертикальной)
-            const cosAngle = Math.cos(-playerAngle);
-            const sinAngle = Math.sin(-playerAngle);
+            const cosAngle = Math.cos(playerAngle);
+            const sinAngle = Math.sin(playerAngle);
             
-            // Поворачиваем точку вокруг оси Y
             const rotatedX = dx * cosAngle - dz * sinAngle;
             const rotatedZ = dx * sinAngle + dz * cosAngle;
             
@@ -239,10 +221,8 @@ export class Renderer {
             // в нашей системе координат ось Z вперед, X вправо
             let spriteAngle = Math.atan2(dx, dz);
             
-            // Вычисляем относительный угол (спрайт относительно камеры)
             let relativeAngle = spriteAngle - playerAngle;
             
-            // Нормализуем угол в диапазоне [-π, π]
             while (relativeAngle < -Math.PI) relativeAngle += 2 * Math.PI;
             while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
             
@@ -255,7 +235,7 @@ export class Renderer {
                     ...sprite,
                     distance,
                     correctedDistance: Infinity,
-                    angle: relativeAngle,
+                    angle: spriteAngle,
                     rotatedX,
                     rotatedZ,
                     visible: false

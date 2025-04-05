@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@laranatech/colorana':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       '@laranatech/lareq':
         specifier: ^1.1.5
         version: 1.1.5
@@ -174,8 +174,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@laranatech/colorana@1.0.0':
-    resolution: {integrity: sha512-VhnWkyg/KfCZKYiueYGXXYaBHZ1SqlA7Be3eIoFOzKIHm5zPqJSSo+lbL/RnrjHsiGQkDkukpe8uEz0Xq0RGNw==}
+  '@laranatech/colorana@1.0.1':
+    resolution: {integrity: sha512-ULLeW4zqM//66jzMPGtculEkS7AVEgvaF+na+KieB2UIF4Fbt7jAHlzkz5p6I8l96uwUq8ZCgXWK8T2C/Uw57w==}
 
   '@laranatech/lareq@1.1.5':
     resolution: {integrity: sha512-OmMhqLfQoDO0QegRhIA1blIhjzli7WTo5EcQJq4bXNO6RIbiP8iE1Mq8cxShqhopIbUtXjj3hhb8PLKOc8YKcg==}
@@ -436,7 +436,7 @@ snapshots:
   '@esbuild/win32-x64@0.25.1':
     optional: true
 
-  '@laranatech/colorana@1.0.0':
+  '@laranatech/colorana@1.0.1':
     dependencies:
       '@laranatech/lareq': 1.1.5
 

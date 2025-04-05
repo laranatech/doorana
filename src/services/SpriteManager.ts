@@ -30,8 +30,8 @@ export class SpriteManager {
         
         for (const sprite of this.sprites) {
             const distance = Math.sqrt(
-                Math.pow(sprite.position.x - position.x, 2) +
-                Math.pow(sprite.position.z - position.z, 2)
+                Math.pow(sprite.position.x + 0.5 - position.x, 2) +
+                Math.pow(sprite.position.z + 0.5 - position.z, 2)
             );
             
             if (distance < minDistance) {

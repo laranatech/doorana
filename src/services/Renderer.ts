@@ -76,10 +76,6 @@ export class Renderer {
         // Нам это понадобится для правильного рендеринга спрайтов
         const zBuffer: number[] = new Array(this.RAY_COUNT).fill(Infinity)
         
-        const fov = Math.PI / 3
-        const rayStep = fov / this.RAY_COUNT
-        const startAngle = camera.getRotation() - fov / 2
-        
         this.renderWalls(lareq, width, viewportHeight, camera, map, zBuffer)
 
         this.renderSprites(lareq, width, viewportHeight, sprites, camera, zBuffer)
@@ -139,10 +135,6 @@ export class Renderer {
                 )
                 
                 if (doorOffset < 1) {
-                    // Рисуем дверь с анимацией слева направо
-                    const doorWidth = (width / this.RAY_COUNT) * (1 - doorOffset)
-                    const doorX = (width * i) / this.RAY_COUNT
-                    
                     if (wallType === 'D') {
                         baseWallColor = '#A0522D'
                     } else {
@@ -281,28 +273,19 @@ export class Renderer {
         // Координаты игрока и спрайта в мировом пространстве
         const playerPos = camera.getPosition();
         const playerAngle = camera.getRotation();
+        const cosAngle = Math.cos(playerAngle);
+        const sinAngle = Math.sin(playerAngle);
         const fov = Math.PI / 3;
         
         // Подготавливаем спрайты для рендеринга
         const preparedSprites = sprites.map(sprite => {
-            const dx = sprite.position.x - playerPos.x;
-            const dz = sprite.position.z - playerPos.z;
+            const dx = sprite.position.x + 0.5 - playerPos.x;
+            const dz = sprite.position.z + 0.5 - playerPos.z;
             const distance = Math.sqrt(dx * dx + dz * dz);
             
-            // Отладочная информация
-            this.debug(`Sprite at world position: (${sprite.position.x}, ${sprite.position.z})`);
-            this.debug(`Player position: (${playerPos.x}, ${playerPos.z}), Angle: ${playerAngle}`);
-            this.debug(`Delta: (${dx}, ${dz}), Distance: ${distance}`);
-            
-            // Проверка, не находится ли спрайт слишком близко
-            if (distance <= 0.1) {
+            if (distance <= 0.2) {
                 return invisibleSprite;
             }
-            
-            // Нам нужны координаты спрайта относительно направления взгляда камеры
-            // Выполняем матричное преобразование для поворота координат вокруг оси Y (вертикальной)
-            const cosAngle = Math.cos(playerAngle);
-            const sinAngle = Math.sin(playerAngle);
             
             const rotatedX = dx * cosAngle - dz * sinAngle;
             const rotatedZ = dx * sinAngle + dz * cosAngle;

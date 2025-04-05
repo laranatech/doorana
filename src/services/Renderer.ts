@@ -5,6 +5,7 @@ import { Vector3 } from './Vector3'
 import { Map } from './Map'
 import { RendererUtils } from './RendererUtils'
 import { RendererDoomPanel } from './RendererDoomPanel'
+import { DoorAnimationService } from './DoorAnimationService'
 
 interface PreparedSprite {
     position: Vector3;
@@ -35,11 +36,13 @@ export class Renderer {
     private debugEnabled: boolean = false // Флаг для включения/выключения отладки
     private utils: RendererUtils = new RendererUtils()
     private doomPanel: RendererDoomPanel = new RendererDoomPanel()
+    private doorAnimationService: DoorAnimationService
 
-    constructor(renderer: CanvasRenderer, rayCount: number = 480, wallHeight: number = 1) {
+    constructor(renderer: CanvasRenderer, rayCount: number = 480, wallHeight: number = 1, doorAnimationService: DoorAnimationService) {
         this.renderer = renderer
         this.RAY_COUNT = rayCount
         this.WALL_HEIGHT = wallHeight
+        this.doorAnimationService = doorAnimationService
     }
     
     // Включить/выключить отладочный режим
@@ -97,6 +100,7 @@ export class Renderer {
         const fov = Math.PI / 3
         const rayStep = fov / this.RAY_COUNT
         const startAngle = camera.getRotation() - fov / 2
+        const renderTag = Math.random()
         
         // Рендеринг стен с повышенной точностью
         for (let i = 0; i < this.RAY_COUNT; i++) {
@@ -106,70 +110,110 @@ export class Renderer {
             // Сохраняем расстояние в Z-буфере
             zBuffer[i] = hitWall ? distance : Infinity
             
-            if (hitWall) {
-                // Вычисляем высоту стены с учетом эффекта "рыбий глаз"
-                // Корректируем проекцию, чтобы избавиться от искажения "рыбий глаз"
-                const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
-                const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
-                const wallTop = (height - wallHeight) / 2
-                const wallBottom = wallTop + wallHeight
-                
-                // Применяем эффект тумана/затемнения с расстоянием
-                const brightness = this.utils.calculateBrightness(correctedDistance);
-                
-                // Добавляем псевдотекстуру стены с помощью эффекта смены оттенков
-                // в зависимости от позиции на стене
-                let wallColor;
-                
-                // Меняем цвет в зависимости от четности клетки для создания эффекта кирпичей
-                const worldPosX = camera.getPosition().x + Math.sin(rayAngle) * distance;
-                const worldPosZ = camera.getPosition().z + Math.cos(rayAngle) * distance;
-                const xOffset = worldPosX - Math.floor(worldPosX);
-                const zOffset = worldPosZ - Math.floor(worldPosZ);
-                
-                // Проверяем тип стены (обычная, дверь или запертая дверь)
-                const wallType = map.getWallType(Math.floor(worldPosX), Math.floor(worldPosZ));
-                
-                // Определяем, по какой стороне клетки был удар (север, юг, восток, запад)
-                let wallSide = '';
-                const EPSILON = 0.01;
-                
-                if (xOffset < EPSILON) wallSide = 'west';
-                else if (xOffset > 1 - EPSILON) wallSide = 'east';
-                else if (zOffset < EPSILON) wallSide = 'north';
-                else if (zOffset > 1 - EPSILON) wallSide = 'south';
-                
-                // Выбираем цвет стены в зависимости от стороны света и типа стены
-                let baseWallColor;
-                
-                if (wallType === 'D') { // Обычная дверь
-                    baseWallColor = '#A0522D'; // Коричневый для дверей
-                } else if (wallType === 'L') { // Запертая дверь
-                    baseWallColor = '#8B4513'; // Темно-коричневый для запертых дверей
-                } else { // Обычная стена
-                    switch(wallSide) {
-                        case 'north': baseWallColor = '#7F6A4C'; break; // Коричневатый для северных стен
-                        case 'south': baseWallColor = '#736048'; break; // Чуть темнее для южных стен
-                        case 'east': baseWallColor = '#8A7254'; break;  // Светлее для восточных стен
-                        case 'west': baseWallColor = '#6A5A40'; break;  // Темнее для западных стен
-                        default: baseWallColor = '#7A6852'; break;      // Стандартный цвет стен DOOM
-                    }
+            if (!hitWall) {
+                continue;
+            }
+
+            // Вычисляем высоту стены с учетом эффекта "рыбий глаз"
+            // Корректируем проекцию, чтобы избавиться от искажения "рыбий глаз"
+            const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
+            const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
+            const wallTop = (height - wallHeight) / 2
+            const wallBottom = wallTop + wallHeight
+            
+            // Применяем эффект тумана/затемнения с расстоянием
+            const brightness = this.utils.calculateBrightness(correctedDistance);
+            
+            // Добавляем псевдотекстуру стены с помощью эффекта смены оттенков
+            // в зависимости от позиции на стене
+            let wallColor;
+            
+            // Меняем цвет в зависимости от четности клетки для создания эффекта кирпичей
+            const worldPosX = camera.getPosition().x + Math.sin(rayAngle) * distance;
+            const worldPosZ = camera.getPosition().z + Math.cos(rayAngle) * distance;
+            const xOffset = worldPosX - Math.floor(worldPosX);
+            const zOffset = worldPosZ - Math.floor(worldPosZ);
+            
+            // Проверяем тип стены (обычная, дверь или запертая дверь)
+            const wallType = map.getWallType(Math.floor(worldPosX), Math.floor(worldPosZ));
+            
+            // Определяем, по какой стороне клетки был удар (север, юг, восток, запад)
+            let wallSide = '';
+            const EPSILON = 0.01;
+            
+            if (xOffset < EPSILON) wallSide = 'west';
+            else if (xOffset > 1 - EPSILON) wallSide = 'east';
+            else if (zOffset < EPSILON) wallSide = 'north';
+            else if (zOffset > 1 - EPSILON) wallSide = 'south';
+            
+            // Выбираем цвет стены в зависимости от стороны света и типа стены
+            let baseWallColor;
+            
+            if (wallType === 'D' || wallType === 'L') {
+                const doorHeight = this.doorAnimationService.getDoorHeight(
+                    Math.floor(worldPosX),
+                    Math.floor(worldPosZ)
+                )
+                if (doorHeight < 1) {
+                    console.log(doorHeight)
                 }
                 
-                wallColor = this.utils.applyBrightness(baseWallColor, brightness);
-                
-                // Рисуем стену
-                lareq.command.setCtx({
-                    fillStyle: wallColor
-                })
-                lareq.command.beginPath()
-                lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
-                lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
-                lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
-                lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
-                lareq.command.closePath()
-                lareq.command.fill()
+                // Если дверь анимируется, корректируем высоту стены
+                if (doorHeight < 1) {
+                    const adjustedWallHeight = wallHeight * doorHeight
+                    const adjustedWallTop = (height - adjustedWallHeight) / 2
+                    const adjustedWallBottom = adjustedWallTop + adjustedWallHeight
+                    
+                    // Рисуем дверь с учетом анимации
+                    if (wallType === 'D') {
+                        baseWallColor = '#A0522D'; // Коричневый для дверей
+                    } else {
+                        baseWallColor = '#8B4513'; // Темно-коричневый для запертых дверей
+                    }
+                    
+                    wallColor = this.utils.applyBrightness(baseWallColor, brightness);
+                    
+                    lareq.command.setCtx({
+                        fillStyle: wallColor
+                    })
+                    lareq.command.beginPath()
+                    lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: adjustedWallTop })
+                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: adjustedWallTop })
+                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: adjustedWallBottom })
+                    lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: adjustedWallBottom })
+                    lareq.command.closePath()
+                    lareq.command.fill()
+                    continue;
+                }
             }
+            
+            if (wallType === 'D') { // Обычная дверь
+                baseWallColor = '#A0522D'; // Коричневый для дверей
+            } else if (wallType === 'L') { // Запертая дверь
+                baseWallColor = '#8B4513'; // Темно-коричневый для запертых дверей
+            } else { // Обычная стена
+                switch(wallSide) {
+                    case 'north': baseWallColor = '#7F6A4C'; break; // Коричневатый для северных стен
+                    case 'south': baseWallColor = '#736048'; break; // Чуть темнее для южных стен
+                    case 'east': baseWallColor = '#8A7254'; break;  // Светлее для восточных стен
+                    case 'west': baseWallColor = '#6A5A40'; break;  // Темнее для западных стен
+                    default: baseWallColor = '#7A6852'; break;      // Стандартный цвет стен DOOM
+                }
+            }
+            
+            wallColor = this.utils.applyBrightness(baseWallColor, brightness);
+            
+            // Рисуем стену
+            lareq.command.setCtx({
+                fillStyle: wallColor
+            })
+            lareq.command.beginPath()
+            lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
+            lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
+            lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
+            lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
+            lareq.command.closePath()
+            lareq.command.fill()
         }
     }
 

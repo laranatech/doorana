@@ -128,7 +128,7 @@ export class Map {
         
         // Открываем дверь, меняя карту
         door.isOpen = true;
-        this.map[door.y][door.x] = ' '; // Дверь больше не препятствие
+        // this.map[door.y][door.x] = ' '; // Дверь больше не препятствие
         
         // Удаляем спрайт двери, если он есть
         const doorSprite = this.items.findIndex(sprite => 

@@ -5,6 +5,8 @@ import { Renderer } from './services/Renderer'
 import { CollisionService } from './services/CollisionService'
 import { SpriteManager, Sprite } from './services/SpriteManager'
 import { Vector3 } from './services/Vector3'
+import { DoorAnimationService } from './services/DoorAnimationService'
+import { CombatService } from './services/CombatService'
 
 export class Game {
 	renderer: CanvasRenderer
@@ -13,6 +15,8 @@ export class Game {
 	gameRenderer: Renderer
 	collisionService: CollisionService
 	spriteManager: SpriteManager
+	doorAnimationService: DoorAnimationService
+	combatService: CombatService
 	playerHealth: number = 100
 	showMessage: string = ''
 	messageTimeout: number | null = null
@@ -27,6 +31,8 @@ export class Game {
 		this.map = new Map()
 		this.spriteManager = new SpriteManager()
 		this.collisionService = new CollisionService(this.map)
+		this.doorAnimationService = new DoorAnimationService()
+		this.combatService = new CombatService(this.spriteManager)
 		
 		// Настройка камеры
 		const playerPos = this.map.getPlayerPosition()
@@ -34,11 +40,15 @@ export class Game {
 		this.camera.setCollisionService(this.collisionService)
 		
 		// Настройка рендерера
-		this.gameRenderer = new Renderer(renderer)
+		this.gameRenderer = new Renderer(renderer, 480, 1, this.doorAnimationService)
 		
 		// Добавляем предметы из карты в менеджер спрайтов
 		this.map.getItems().forEach(item => {
 			this.spriteManager.addSprite(item)
+			// Если это враг, добавляем его в CombatService
+			if (item.texture === 'enemy') {
+				this.combatService.addEnemy(item.position)
+			}
 		})
 		
 		// Добавляем тестовый спрайт если предметов нет
@@ -69,6 +79,9 @@ export class Game {
 		// Обновляем состояние камеры
 		this.camera.update(deltaTime)
 		
+		// Обновляем анимацию дверей
+		this.doorAnimationService.update(deltaTime)
+		
 		// Обрабатываем движение на основе нажатых клавиш
 		this.handleMovement()
 		
@@ -84,12 +97,15 @@ export class Game {
 
 	handleKeyDown(key: string) {
 		switch (key.toLowerCase()) {
-			case 'e': case 'е': case ' ':
+			case 'e': case 'у':
 				this.tryOpenDoor()
 				break
 			case 'o':
 				this.gameRenderer.toggleDebug()
 				console.log('Отладка спрайтов включена')
+				break
+			case 'f': case ' ': // Стрельба
+				this.shoot()
 				break
 		}
 	}
@@ -169,22 +185,38 @@ export class Game {
 		}
 	}
 	
+	// Обработка выстрела
+	private shoot() {
+		if (this.playerAmmo <= 0) {
+			this.showMessageOnScreen('Нет патронов!')
+			return
+		}
+
+		this.playerAmmo--
+		const hitEnemy = this.combatService.shoot(
+			this.camera.getPosition(),
+			this.camera.getRotation()
+		)
+
+		if (hitEnemy) {
+			this.showMessageOnScreen('Попадание!')
+		}
+	}
+	
 	// Попытка открыть дверь перед игроком
 	private tryOpenDoor() {
 		const playerPos = this.camera.getPosition()
 		const playerAngle = this.camera.getRotation()
 		
-		// Проверяем позицию непосредственно перед игроком
-		const doorCheckDistance = 1.2 // Расстояние для проверки двери
+		const doorCheckDistance = 1.2
 		const doorX = Math.floor(playerPos.x + Math.sin(playerAngle) * doorCheckDistance)
 		const doorZ = Math.floor(playerPos.z + Math.cos(playerAngle) * doorCheckDistance)
 		
-		// Проверяем, есть ли дверь по указанным координатам
 		if (this.map.isDoor(doorX, doorZ)) {
-			// Пытаемся открыть дверь
 			const doorOpened = this.map.tryOpenDoor(doorX, doorZ)
 			
 			if (doorOpened) {
+				this.doorAnimationService.addDoor(doorX, doorZ)
 				this.showMessageOnScreen('Дверь открыта!')
 			} else {
 				this.showMessageOnScreen('Нужен ключ для открытия этой двери!')

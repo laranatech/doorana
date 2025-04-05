@@ -25,16 +25,49 @@ export class RendererUtils {
         )
         const coordX = Math.floor(worldPos.x)
         const coordZ = Math.floor(worldPos.z)
+        
         if (map.isTransparentWall(coordX, coordZ)) {
-          if (doorAnimationService.isDoorAnimating(coordX, coordZ)) {
-            distance += step
-            continue
-          }
-          return { distance, hitWall: true }
+            const doorOffset = doorAnimationService.getDoorOffset(coordX, coordZ)
+            
+            // Если дверь полностью открыта, луч проходит сквозь неё
+            if (doorOffset >= 1) {
+                distance += step
+                continue
+            }
+
+            if (doorOffset === 0) {
+              return { distance, hitWall: true }
+            }
+            
+            // Если дверь частично открыта, проверяем, проходит ли луч через щель
+            const xOffset = worldPos.x - coordX
+            const zOffset = worldPos.z - coordZ
+            
+            // Определяем, с какой стороны мы подходим к двери
+            const isHorizontalWall = Math.abs(xOffset) < doorOffset
+            const isVerticalWall = Math.abs(zOffset) < doorOffset
+            
+            if (isHorizontalWall) {
+                // Для горизонтальных стен проверяем смещение по X
+                if (xOffset < doorOffset) {
+                    // Луч проходит через щель
+                    distance += step
+                    continue
+                }
+            } else if (isVerticalWall) {
+                // Для вертикальных стен проверяем смещение по Z
+                if (zOffset < doorOffset) {
+                    // Луч проходит через щель
+                    distance += step
+                    continue
+                }
+            }
+            
+            return { distance, hitWall: true }
         }
         
         if (map.isSolid(coordX, coordZ)) {
-          return { distance, hitWall: true }
+            return { distance, hitWall: true }
         }
         distance += step
     }

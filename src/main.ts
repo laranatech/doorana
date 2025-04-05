@@ -9,5 +9,5 @@ const game = new Game(renderer)
 
 document.addEventListener('DOMContentLoaded', () => {
 	renderer.init()
-	game.update()
+	game.render()
 })

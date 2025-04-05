@@ -41,7 +41,7 @@ export class Renderer {
         }
     }
     
-    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = []) {
+    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '') {
         this.renderer.canvas!.width = window.innerWidth
         this.renderer.canvas!.height = window.innerHeight
         
@@ -54,7 +54,7 @@ export class Renderer {
         
         // Рисуем пол с градиентным эффектом (имитация)
         lareq.command.setCtx({
-            fillStyle: '#686868'
+            fillStyle: '#4A4A4A' // Обновлённый тёмно-серый цвет пола в стиле DOOM
         })
         lareq.command.beginPath()
         lareq.command.moveTo({ x: 0, y: height/2 })
@@ -71,7 +71,7 @@ export class Renderer {
             const yStart = height/2 + t * (height/2);
             const yEnd = height/2 + (t + 1/floorGradientSteps) * (height/2);
             const brightness = 1 * (t + 0.4);
-            const floorColor = this.applyBrightness('#686868', brightness);
+            const floorColor = this.applyBrightness('#4A4A4A', brightness);
             
             lareq.command.setCtx({
                 fillStyle: floorColor
@@ -87,7 +87,7 @@ export class Renderer {
         
         // Рисуем потолок с градиентом
         lareq.command.setCtx({
-            fillStyle: '#414141'
+            fillStyle: '#222222' // Обновлённый тёмный цвет потолка в стиле DOOM
         })
         lareq.command.beginPath()
         lareq.command.moveTo({ x: 0, y: 0 })
@@ -104,7 +104,7 @@ export class Renderer {
             const yStart = t * (height/2);
             const yEnd = (t + 1/ceilingGradientSteps) * (height/2);
             const brightness = 1 - 0.7 * t;
-            const ceilingColor = this.applyBrightness('#414141', brightness);
+            const ceilingColor = this.applyBrightness('#222222', brightness);
             
             lareq.command.setCtx({
                 fillStyle: ceilingColor
@@ -164,7 +164,17 @@ export class Renderer {
                 else if (zOffset < EPSILON) wallSide = 'north';
                 else if (zOffset > 1 - EPSILON) wallSide = 'south';
                 
-                wallColor = this.applyBrightness('#333333', brightness);
+                // Выбираем цвет стены в зависимости от стороны света в стиле DOOM
+                let baseWallColor;
+                switch(wallSide) {
+                    case 'north': baseWallColor = '#7F6A4C'; break; // Коричневатый для северных стен
+                    case 'south': baseWallColor = '#736048'; break; // Чуть темнее для южных стен
+                    case 'east': baseWallColor = '#8A7254'; break;  // Светлее для восточных стен
+                    case 'west': baseWallColor = '#6A5A40'; break;  // Темнее для западных стен
+                    default: baseWallColor = '#7A6852'; break;      // Стандартный цвет стен DOOM
+                }
+                
+                wallColor = this.applyBrightness(baseWallColor, brightness);
                 
                 // Рисуем стену
                 lareq.command.setCtx({
@@ -322,6 +332,26 @@ export class Renderer {
             }
         });
         
+        // Отображаем сообщение, если оно есть
+        if (message) {
+            const messageX = width / 2;
+            const messageY = height - 50; // Внизу экрана с отступом
+            
+            lareq.command.setCtx({
+                font: '20px Arial',
+                fillStyle: '#FFFFFF',
+                textAlign: 'center',
+                textBaseline: 'middle'
+            });
+            
+            lareq.command.fillText({
+                text: message,
+                x: messageX,
+                y: messageY,
+                maxWidth: width * 0.8 // Максимальная ширина текста
+            });
+        }
+        
         this.renderer.prepare(lareq.commands);
         this.renderer.render(lareq.commands);
     }
@@ -351,12 +381,13 @@ export class Renderer {
     // Выбираем цвет для спрайта в зависимости от его типа
     private getSpriteColor(texture: string): string {
         switch (texture) {
-            case 'enemy': return '#AA2200'; // Красный для врагов
-            case 'health': return '#00AA00'; // Зеленый для здоровья
-            case 'ammo': return '#0000AA'; // Синий для боеприпасов
-            case 'weapon': return '#AAAA00'; // Желтый для оружия
-            case 'key': return '#AA00AA'; // Фиолетовый для ключей
-            default: return '#AAAAAA'; // Серый для всего остального
+            case 'enemy': return '#BE2126'; // Красный для врагов
+            case 'health': return '#2FBA3D'; // Зеленый для здоровья
+            case 'ammo': return '#3D629A'; // Синий для боеприпасов
+            case 'weapon': return '#D9A648'; // Желтый для оружия
+            case 'key': return '#D355BA'; // Фиолетовый для ключей
+            case 'door': return '#8B572A'; // Коричневый для дверей
+            default: return '#B0B0B0'; // Серый для всего остального
         }
     }
     

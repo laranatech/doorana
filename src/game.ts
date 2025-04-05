@@ -13,6 +13,9 @@ export class Game {
 	gameRenderer: Renderer
 	collisionService: CollisionService
 	spriteManager: SpriteManager
+	playerHealth: number = 100
+	showMessage: string = ''
+	messageTimeout: number | null = null
 
 	constructor(renderer: CanvasRenderer) {
 		this.renderer = renderer
@@ -68,26 +71,114 @@ export class Game {
 				break
 			case 'w': case 'ц':
 				this.camera.moveForward()
+				this.checkInteractions()
 				break
 			case 's': case 'ы':
 				this.camera.moveBackward()
+				this.checkInteractions()
 				break
 			case 'a': case 'ф':
 				this.camera.moveLeft()
+				this.checkInteractions()
 				break
 			case 'd': case 'в':
 				this.camera.moveRight()
+				this.checkInteractions()
 				break
-			// Добавляем управление отладкой - клавиша D включает/выключает отладку
+			// Добавляем взаимодействие с дверьми - клавиша E/space
+			case 'e': case 'е': case ' ':
+				this.tryOpenDoor()
+				break
+			// Добавляем управление отладкой - клавиша O включает/выключает отладку
 			case 'o':
 				this.gameRenderer.toggleDebug()
 				console.log('Отладка спрайтов включена')
 				break
 		}
-		this.update()
+		this.render()
+	}
+	
+	// Проверка взаимодействий с предметами при движении
+	private checkInteractions() {
+		const playerPos = this.camera.getPosition()
+		
+		// Проверяем, есть ли рядом предметы для подбора
+		const nearbyItem = this.spriteManager.findSpriteNear(playerPos, 0.7)
+		
+		if (nearbyItem) {
+			// Обрабатываем подбор предмета в зависимости от его типа
+			switch (nearbyItem.texture) {
+				case 'key': // Подбор ключа
+					this.map.addKey()
+					this.spriteManager.removeSprite(nearbyItem)
+					this.showMessageOnScreen(`Ключ подобран! Ключей: ${this.map.getKeyCount()}`)
+					break
+					
+				case 'health': // Подбор аптечки
+					this.addHealth(25) // Добавляем 25 здоровья
+					this.spriteManager.removeSprite(nearbyItem)
+					this.showMessageOnScreen(`Здоровье восстановлено: ${this.playerHealth}`)
+					break
+					
+				case 'ammo': // Подбор боеприпасов (для будущего развития)
+					this.spriteManager.removeSprite(nearbyItem)
+					this.showMessageOnScreen('Подобраны боеприпасы')
+					break
+					
+				case 'weapon': // Подбор оружия (для будущего развития)
+					this.spriteManager.removeSprite(nearbyItem)
+					this.showMessageOnScreen('Подобрано оружие')
+					break
+			}
+		}
+	}
+	
+	// Попытка открыть дверь перед игроком
+	private tryOpenDoor() {
+		const playerPos = this.camera.getPosition()
+		const playerAngle = this.camera.getRotation()
+		
+		// Проверяем позицию непосредственно перед игроком
+		const doorCheckDistance = 1.2 // Расстояние для проверки двери
+		const doorX = Math.floor(playerPos.x + Math.sin(playerAngle) * doorCheckDistance)
+		const doorZ = Math.floor(playerPos.z + Math.cos(playerAngle) * doorCheckDistance)
+		
+		// Проверяем, есть ли дверь по указанным координатам
+		if (this.map.isDoor(doorX, doorZ)) {
+			// Пытаемся открыть дверь
+			const doorOpened = this.map.tryOpenDoor(doorX, doorZ)
+			
+			if (doorOpened) {
+				this.showMessageOnScreen('Дверь открыта!')
+			} else {
+				this.showMessageOnScreen('Нужен ключ для открытия этой двери!')
+			}
+		}
+	}
+	
+	// Добавляет здоровье игроку с ограничением максимума в 100
+	private addHealth(amount: number) {
+		this.playerHealth = Math.min(100, this.playerHealth + amount)
+	}
+	
+	// Показывает сообщение на экране на несколько секунд
+	private showMessageOnScreen(message: string, duration: number = 2000) {
+		this.showMessage = message
+		
+		// Очищаем предыдущий таймер, если был
+		if (this.messageTimeout !== null) {
+			clearTimeout(this.messageTimeout)
+		}
+		
+		// Устанавливаем новый таймер для скрытия сообщения
+		this.messageTimeout = window.setTimeout(() => {
+			this.showMessage = ''
+			this.messageTimeout = null
+			this.render() // Обновляем экран после скрытия сообщения
+		}, duration)
 	}
 
-	update() {
+	render() {
 		// Получаем список спрайтов для отображения
 		const sprites = this.spriteManager.getSprites().map(sprite => ({
 			position: sprite.position,
@@ -95,6 +186,6 @@ export class Game {
 		}))
 		
 		// Рендерим сцену
-		this.gameRenderer.render(this.camera, this.map, sprites)
+		this.gameRenderer.render(this.camera, this.map, sprites, this.showMessage)
 	}
 }

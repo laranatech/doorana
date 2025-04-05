@@ -50,6 +50,7 @@ export class CombatService {
                 
                 // Проверяем, убит ли враг
                 if (enemy.health <= 0) {
+                    console.log('hitEnemy', enemy)
                     enemy.isDead = true;
                     // Удаляем спрайт врага
                     this.spriteManager.removeSprite({

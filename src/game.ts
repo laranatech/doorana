@@ -7,6 +7,7 @@ import { SpriteManager, Sprite } from './services/SpriteManager'
 import { Vector3 } from './services/Vector3'
 import { DoorAnimationService } from './services/DoorAnimationService'
 import { CombatService } from './services/CombatService'
+import { EnemyAIService } from './services/EnemyAIService'
 
 export class Game {
 	renderer: CanvasRenderer
@@ -23,6 +24,7 @@ export class Game {
 	playerAmmo: number = 50 // Базовое количество патронов
 	lastTime: number = 0
 	keysPressed: Set<string> = new Set()
+	enemyAIService: EnemyAIService
 
 	constructor(renderer: CanvasRenderer) {
 		this.renderer = renderer
@@ -33,6 +35,12 @@ export class Game {
 		this.doorAnimationService = new DoorAnimationService()
 		this.collisionService = new CollisionService(this.map, this.doorAnimationService)
 		this.combatService = new CombatService(this.spriteManager)
+		this.enemyAIService = new EnemyAIService(
+			this.map,
+			this.collisionService,
+			this.combatService,
+			this.spriteManager
+		)
 		
 		// Настройка камеры
 		const playerPos = this.map.getPlayerPosition()
@@ -48,6 +56,7 @@ export class Game {
 			// Если это враг, добавляем его в CombatService
 			if (item.texture === 'enemy') {
 				this.combatService.addEnemy(item.position)
+				this.enemyAIService.addEnemy(item.position)
 			}
 		})
 		
@@ -81,6 +90,9 @@ export class Game {
 		
 		// Обновляем анимацию дверей
 		this.doorAnimationService.update(deltaTime)
+		
+		// Обновляем AI врагов
+		this.enemyAIService.update(deltaTime, this.camera.getPosition())
 		
 		// Обрабатываем движение на основе нажатых клавиш
 		this.handleMovement()
@@ -183,6 +195,12 @@ export class Game {
 					break
 			}
 		}
+
+		// Проверяем, не атакует ли нас враг
+		const nearbyEnemy = this.spriteManager.findSpriteNear(playerPos, 1.5)
+		if (nearbyEnemy && nearbyEnemy.texture === 'enemy') {
+			this.takeDamage(10) // Получаем урон от врага
+		}
 	}
 	
 	// Обработка выстрела
@@ -267,5 +285,15 @@ export class Game {
 			this.playerHealth,
 			this.playerAmmo
 		)
+	}
+
+	private takeDamage(amount: number) {
+		this.playerHealth = Math.max(0, this.playerHealth - amount)
+		if (this.playerHealth <= 0) {
+			this.showMessageOnScreen('Игра окончена!')
+			// TODO: Добавить экран смерти
+		} else {
+			this.showMessageOnScreen(`Получен урон! Здоровье: ${this.playerHealth}`)
+		}
 	}
 }

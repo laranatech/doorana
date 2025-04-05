@@ -60,4 +60,29 @@ export class SpriteManager {
         }
         return false;
     }
+
+  static getSpriteColor(texture: string): string {
+    switch (texture) {
+      case 'enemy': return '#BE2126'; // Красный для врагов
+      case 'health': return '#2FBA3D'; // Зеленый для здоровья
+      case 'ammo': return '#3D629A'; // Синий для боеприпасов
+      case 'weapon': return '#FFA500'; // Оранжевый для оружия
+      case 'key': return '#D9A648'; // Фиолетовый для ключей
+      case 'door': return '#8B572A'; // Коричневый для дверей
+      default: return '#B0B0B0'; // Серый для всего остального
+    }
+  }
+
+  // [height, width, Y-offset]
+  static getSpriteSize(texture: string): [number, number, number] {
+    switch (texture) {
+      case 'enemy': return [0.9, 0.4, 0.1];
+      case 'health': return [0.3, 0.3, 0.2];
+      case 'ammo': return [0.3, 0.3, 0.2];
+      case 'weapon': return [0.3, 0.6, 0.2];
+      case 'key': return [0.2, 0.4, 0.2];
+      case 'door': return [1, 1, 0];
+      default: return [0.5, 0.5, 0.1];
+    }
+  }
 } 

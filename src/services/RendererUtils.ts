@@ -95,17 +95,4 @@ export class RendererUtils {
       // Преобразуем обратно в HEX
       return `#${darkenedR.toString(16).padStart(2, '0')}${darkenedG.toString(16).padStart(2, '0')}${darkenedB.toString(16).padStart(2, '0')}`;
   }
-  
-  // Выбираем цвет для спрайта в зависимости от его типа
-  public getSpriteColor(texture: string): string {
-      switch (texture) {
-          case 'enemy': return '#BE2126'; // Красный для врагов
-          case 'health': return '#2FBA3D'; // Зеленый для здоровья
-          case 'ammo': return '#3D629A'; // Синий для боеприпасов
-          case 'weapon': return '#D9A648'; // Желтый для оружия
-          case 'key': return '#D355BA'; // Фиолетовый для ключей
-          case 'door': return '#8B572A'; // Коричневый для дверей
-          default: return '#B0B0B0'; // Серый для всего остального
-      }
-  }
 }

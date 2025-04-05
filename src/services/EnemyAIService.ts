@@ -51,7 +51,6 @@ export class EnemyAIService {
         for (const [key, enemy] of this.enemies) {
             if (enemy.isDead) continue;
 
-            // Проверяем видимость игрока
             const canSeePlayer = this.canSeePlayer(enemy.position, playerPosition);
             
             if (canSeePlayer) {
@@ -204,10 +203,7 @@ export class EnemyAIService {
 
     // Обновление спрайта врага
     private updateEnemySprite(key: string, enemy: EnemyState) {
-        const sprite = this.spriteManager.findSpriteNear(enemy.position, 0.1);
-        if (sprite) {
-            sprite.position = enemy.position;
-        }
+        enemy.sprite.position = enemy.position;
     }
 
     // Получение состояния врага

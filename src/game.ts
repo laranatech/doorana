@@ -166,12 +166,6 @@ export class Game {
 					break
 			}
 		}
-
-		// Проверяем, не атакует ли нас враг
-		const nearbyEnemy = this.spriteManager.findSpriteNear(playerPos, 1.5)
-		if (nearbyEnemy && nearbyEnemy.texture === 'enemy') {
-			this.takeDamage(10) // Получаем урон от врага
-		}
 	}
 	
 	// Обработка выстрела

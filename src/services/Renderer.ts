@@ -6,6 +6,7 @@ import { Map } from './Map'
 import { RendererUtils } from './RendererUtils'
 import { RendererDoomPanel } from './RendererDoomPanel'
 import { DoorAnimationService } from './DoorAnimationService'
+import { SpriteManager } from './SpriteManager'
 
 interface PreparedSprite {
     position: Vector3;
@@ -327,9 +328,10 @@ export class Renderer {
         // Рендерим спрайты от дальних к ближним
         preparedSprites.forEach(sprite => {
             // Размер спрайта пропорционален расстоянию
+            const [spriteBaseHeight, spriteBaseWidth, spriteYOffset] = SpriteManager.getSpriteSize(sprite.texture);
             const spriteSize = (height / sprite.distance) * this.WALL_HEIGHT * 1;
-            const spriteWidth = spriteSize * 0.3;
-            const spriteHeight = spriteSize;
+            const spriteWidth = spriteSize * spriteBaseWidth;
+            const spriteHeight = spriteSize * spriteBaseHeight;
             
             // Вычисляем экранную позицию спрайта используя повернутые координаты
             // Преобразуем трехмерные координаты в экранные координаты
@@ -340,7 +342,7 @@ export class Renderer {
             // Используем функцию проекции: screen_x = (width/2) * (1 + rotatedX / (rotatedZ * tan(fov/2)))
             const halfFov = fov / 2;
             const spriteX = width / 2 * (1 + sprite.rotatedX / (sprite.rotatedZ * Math.tan(halfFov)));
-            const spriteY = height / 2; // Всегда центрируем по вертикали
+            const spriteY = height / 2 + spriteSize * spriteYOffset; // Всегда центрируем по вертикали
             
             // Отладочная информация о позиции спрайта на экране
             this.debug(`Sprite screen position: x=${spriteX}, y=${spriteY}, width=${spriteWidth}, height=${spriteHeight}`);
@@ -362,7 +364,7 @@ export class Renderer {
             
             // Применяем эффект тумана/затемнения к спрайту
             const brightness = this.utils.calculateBrightness(sprite.correctedDistance);
-            const spriteColor = this.utils.applyBrightness(this.utils.getSpriteColor(sprite.texture), brightness);
+            const spriteColor = this.utils.applyBrightness(SpriteManager.getSpriteColor(sprite.texture), brightness);
             
             // Устанавливаем цвет для спрайта с учетом расстояния
             lareq.command.setCtx({

@@ -79,8 +79,8 @@ export class Map {
                         locked: false,
                         isOpen: false
                     });
-                    // Заменяем символ двери на '#', чтобы она считалась стеной, пока не открыта
-                    this.map[y][x] = '#';
+                    // Заменяем символ двери на 'D', чтобы отличать от обычных стен
+                    this.map[y][x] = 'D';
                 } else if (symbol === 'L') { // Запертая дверь (нужен ключ)
                     this.doors.push({
                         x,
@@ -88,15 +88,8 @@ export class Map {
                         locked: true,
                         isOpen: false
                     });
-                    // Заменяем символ двери на '#', чтобы она считалась стеной, пока не открыта
-                    this.map[y][x] = '#';
-                    
-                    // Добавляем спрайт для отображения замка на двери
-                    this.items.push({
-                        position: new Vector3(x, 0, y),
-                        texture: 'door',
-                        type: 'decoration'
-                    });
+                    // Заменяем символ запертой двери на 'L'
+                    this.map[y][x] = 'L';
                 }
             }
         }
@@ -106,7 +99,8 @@ export class Map {
         if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
             return true
         }
-        return this.map[y][x] === '#'
+        // Стена или закрытая дверь
+        return this.map[y][x] === '#' || this.map[y][x] === 'D' || this.map[y][x] === 'L'
     }
 
     // Проверяет, есть ли дверь в указанной позиции
@@ -167,5 +161,13 @@ export class Map {
     
     getItems(): Sprite[] {
         return this.items
+    }
+
+    // Проверка на тип стены - обычная, дверь или запертая дверь
+    getWallType(x: number, y: number): string {
+        if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
+            return '#'; // За пределами карты - обычная стена
+        }
+        return this.map[y][x];
     }
 } 

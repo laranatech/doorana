@@ -16,6 +16,7 @@ export class Game {
 	playerHealth: number = 100
 	showMessage: string = ''
 	messageTimeout: number | null = null
+	playerAmmo: number = 50 // Базовое количество патронов
 
 	constructor(renderer: CanvasRenderer) {
 		this.renderer = renderer
@@ -120,12 +121,14 @@ export class Game {
 					this.showMessageOnScreen(`Здоровье восстановлено: ${this.playerHealth}`)
 					break
 					
-				case 'ammo': // Подбор боеприпасов (для будущего развития)
+				case 'ammo': // Подбор боеприпасов
+					this.addAmmo(15) // Добавляем 15 патронов
 					this.spriteManager.removeSprite(nearbyItem)
-					this.showMessageOnScreen('Подобраны боеприпасы')
+					this.showMessageOnScreen(`Подобраны боеприпасы: ${this.playerAmmo}`)
 					break
 					
-				case 'weapon': // Подбор оружия (для будущего развития)
+				case 'weapon': // Подбор оружия
+					this.addAmmo(25) // Добавляем 25 патронов при подборе оружия
 					this.spriteManager.removeSprite(nearbyItem)
 					this.showMessageOnScreen('Подобрано оружие')
 					break
@@ -161,6 +164,11 @@ export class Game {
 		this.playerHealth = Math.min(100, this.playerHealth + amount)
 	}
 	
+	// Добавляет патроны игроку с ограничением максимума в 100
+	private addAmmo(amount: number) {
+		this.playerAmmo = Math.min(100, this.playerAmmo + amount)
+	}
+	
 	// Показывает сообщение на экране на несколько секунд
 	private showMessageOnScreen(message: string, duration: number = 2000) {
 		this.showMessage = message
@@ -185,7 +193,14 @@ export class Game {
 			texture: sprite.texture
 		}))
 		
-		// Рендерим сцену
-		this.gameRenderer.render(this.camera, this.map, sprites, this.showMessage)
+		// Рендерим сцену с передачей информации о здоровье и патронах
+		this.gameRenderer.render(
+			this.camera, 
+			this.map, 
+			sprites, 
+			this.showMessage,
+			this.playerHealth,
+			this.playerAmmo
+		)
 	}
 }

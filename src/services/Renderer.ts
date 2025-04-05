@@ -41,7 +41,7 @@ export class Renderer {
         }
     }
     
-    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '') {
+    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '', playerHealth: number = 100, ammo: number = 50) {
         this.renderer.canvas!.width = window.innerWidth
         this.renderer.canvas!.height = window.innerHeight
         
@@ -52,15 +52,19 @@ export class Renderer {
         // Очищаем экран
         lareq.command.clearRect({ x: 0, y: 0, w: width, h: height })
         
+        // Определим высоту нижней панели
+        const panelHeight = 60;
+        const viewportHeight = height - panelHeight;
+        
         // Рисуем пол с градиентным эффектом (имитация)
         lareq.command.setCtx({
             fillStyle: '#4A4A4A' // Обновлённый тёмно-серый цвет пола в стиле DOOM
         })
         lareq.command.beginPath()
-        lareq.command.moveTo({ x: 0, y: height/2 })
-        lareq.command.lineTo({ x: width, y: height/2 })
-        lareq.command.lineTo({ x: width, y: height })
-        lareq.command.lineTo({ x: 0, y: height })
+        lareq.command.moveTo({ x: 0, y: viewportHeight/2 })
+        lareq.command.lineTo({ x: width, y: viewportHeight/2 })
+        lareq.command.lineTo({ x: width, y: viewportHeight })
+        lareq.command.lineTo({ x: 0, y: viewportHeight })
         lareq.command.closePath()
         lareq.command.fill()
         
@@ -68,8 +72,8 @@ export class Renderer {
         const floorGradientSteps = 8;
         for (let i = 0; i < floorGradientSteps; i++) {
             const t = i / floorGradientSteps;
-            const yStart = height/2 + t * (height/2);
-            const yEnd = height/2 + (t + 1/floorGradientSteps) * (height/2);
+            const yStart = viewportHeight/2 + t * (viewportHeight/2);
+            const yEnd = viewportHeight/2 + (t + 1/floorGradientSteps) * (viewportHeight/2);
             const brightness = 1 * (t + 0.4);
             const floorColor = this.applyBrightness('#4A4A4A', brightness);
             
@@ -92,8 +96,8 @@ export class Renderer {
         lareq.command.beginPath()
         lareq.command.moveTo({ x: 0, y: 0 })
         lareq.command.lineTo({ x: width, y: 0 })
-        lareq.command.lineTo({ x: width, y: height/2 })
-        lareq.command.lineTo({ x: 0, y: height/2 })
+        lareq.command.lineTo({ x: width, y: viewportHeight/2 })
+        lareq.command.lineTo({ x: 0, y: viewportHeight/2 })
         lareq.command.closePath()
         lareq.command.fill()
         
@@ -101,8 +105,8 @@ export class Renderer {
         const ceilingGradientSteps = 8;
         for (let i = 0; i < ceilingGradientSteps; i++) {
             const t = i / ceilingGradientSteps;
-            const yStart = t * (height/2);
-            const yEnd = (t + 1/ceilingGradientSteps) * (height/2);
+            const yStart = t * (viewportHeight/2);
+            const yEnd = (t + 1/ceilingGradientSteps) * (viewportHeight/2);
             const brightness = 1 - 0.7 * t;
             const ceilingColor = this.applyBrightness('#222222', brightness);
             
@@ -138,8 +142,8 @@ export class Renderer {
                 // Вычисляем высоту стены с учетом эффекта "рыбий глаз"
                 // Корректируем проекцию, чтобы избавиться от искажения "рыбий глаз"
                 const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
-                const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
-                const wallTop = (height - wallHeight) / 2
+                const wallHeight = (viewportHeight / correctedDistance) * this.WALL_HEIGHT
+                const wallTop = (viewportHeight - wallHeight) / 2
                 const wallBottom = wallTop + wallHeight
                 
                 // Применяем эффект тумана/затемнения с расстоянием
@@ -155,6 +159,9 @@ export class Renderer {
                 const xOffset = worldPosX - Math.floor(worldPosX);
                 const zOffset = worldPosZ - Math.floor(worldPosZ);
                 
+                // Проверяем тип стены (обычная, дверь или запертая дверь)
+                const wallType = map.getWallType(Math.floor(worldPosX), Math.floor(worldPosZ));
+                
                 // Определяем, по какой стороне клетки был удар (север, юг, восток, запад)
                 let wallSide = '';
                 const EPSILON = 0.01;
@@ -164,14 +171,21 @@ export class Renderer {
                 else if (zOffset < EPSILON) wallSide = 'north';
                 else if (zOffset > 1 - EPSILON) wallSide = 'south';
                 
-                // Выбираем цвет стены в зависимости от стороны света в стиле DOOM
+                // Выбираем цвет стены в зависимости от стороны света и типа стены
                 let baseWallColor;
-                switch(wallSide) {
-                    case 'north': baseWallColor = '#7F6A4C'; break; // Коричневатый для северных стен
-                    case 'south': baseWallColor = '#736048'; break; // Чуть темнее для южных стен
-                    case 'east': baseWallColor = '#8A7254'; break;  // Светлее для восточных стен
-                    case 'west': baseWallColor = '#6A5A40'; break;  // Темнее для западных стен
-                    default: baseWallColor = '#7A6852'; break;      // Стандартный цвет стен DOOM
+                
+                if (wallType === 'D') { // Обычная дверь
+                    baseWallColor = '#A0522D'; // Коричневый для дверей
+                } else if (wallType === 'L') { // Запертая дверь
+                    baseWallColor = '#8B4513'; // Темно-коричневый для запертых дверей
+                } else { // Обычная стена
+                    switch(wallSide) {
+                        case 'north': baseWallColor = '#7F6A4C'; break; // Коричневатый для северных стен
+                        case 'south': baseWallColor = '#736048'; break; // Чуть темнее для южных стен
+                        case 'east': baseWallColor = '#8A7254'; break;  // Светлее для восточных стен
+                        case 'west': baseWallColor = '#6A5A40'; break;  // Темнее для западных стен
+                        default: baseWallColor = '#7A6852'; break;      // Стандартный цвет стен DOOM
+                    }
                 }
                 
                 wallColor = this.applyBrightness(baseWallColor, brightness);
@@ -335,7 +349,7 @@ export class Renderer {
         // Отображаем сообщение, если оно есть
         if (message) {
             const messageX = width / 2;
-            const messageY = height - 50; // Внизу экрана с отступом
+            const messageY = viewportHeight - 50; // Внизу экрана с отступом
             
             lareq.command.setCtx({
                 font: '20px Arial',
@@ -352,8 +366,265 @@ export class Renderer {
             });
         }
         
+        // Рисуем нижнюю панель в стиле DOOM
+        this.drawDoomPanel(lareq, width, height, viewportHeight, playerHealth, ammo);
+        
         this.renderer.prepare(lareq.commands);
         this.renderer.render(lareq.commands);
+    }
+    
+    // Метод для отрисовки нижней панели в стиле DOOM
+    private drawDoomPanel(lareq: RenderQueue, width: number, height: number, viewportHeight: number, playerHealth: number, ammo: number) {
+        // Фон для нижней панели
+        lareq.command.setCtx({
+            fillStyle: '#2C2C2C'
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: 0, y: viewportHeight });
+        lareq.command.lineTo({ x: width, y: viewportHeight });
+        lareq.command.lineTo({ x: width, y: height });
+        lareq.command.lineTo({ x: 0, y: height });
+        lareq.command.closePath();
+        lareq.command.fill();
+        
+        // Рамка лица в стиле DOOM
+        const faceSize = 50;
+        const faceX = width / 2 - faceSize / 2;
+        const faceY = viewportHeight + 5;
+        
+        // Рамка для лица
+        lareq.command.setCtx({
+            fillStyle: '#3A3A3A',
+            strokeStyle: '#777777',
+            lineWidth: 2
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: faceX, y: faceY });
+        lareq.command.lineTo({ x: faceX + faceSize, y: faceY });
+        lareq.command.lineTo({ x: faceX + faceSize, y: faceY + faceSize });
+        lareq.command.lineTo({ x: faceX, y: faceY + faceSize });
+        lareq.command.closePath();
+        lareq.command.fill();
+        lareq.command.stroke();
+        
+        // Рисуем лицо (упрощенно - используем прямоугольники и линии)
+        lareq.command.setCtx({
+            fillStyle: '#FFC0CB', // Розовый цвет кожи
+            strokeStyle: '#000000'
+        });
+        
+        // Простое выражение лица в зависимости от здоровья
+        if (playerHealth > 60) {
+            // Счастливое лицо
+            // Глаза (прямоугольники)
+            lareq.command.setCtx({
+                fillStyle: '#000000'
+            });
+            // Левый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Правый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Улыбка (квадратная)
+            lareq.command.setCtx({
+                strokeStyle: '#000000',
+                lineWidth: 2
+            });
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 32 });
+            lareq.command.lineTo({ x: faceX + 17, y: faceY + 38 });
+            lareq.command.lineTo({ x: faceX + 33, y: faceY + 38 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 32 });
+            lareq.command.stroke();
+        } else if (playerHealth > 20) {
+            // Нейтральное лицо
+            // Глаза (прямоугольники)
+            lareq.command.setCtx({
+                fillStyle: '#000000'
+            });
+            // Левый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Правый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Прямой рот
+            lareq.command.setCtx({
+                strokeStyle: '#000000',
+                lineWidth: 2
+            });
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 35 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 35 });
+            lareq.command.stroke();
+        } else {
+            // Грустное лицо
+            // Глаза (прямоугольники)
+            lareq.command.setCtx({
+                fillStyle: '#000000'
+            });
+            // Левый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 15, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Правый глаз
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 30, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 18 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 23 });
+            lareq.command.lineTo({ x: faceX + 30, y: faceY + 23 });
+            lareq.command.closePath();
+            lareq.command.fill();
+            
+            // Грустный рот (перевернутая дуга)
+            lareq.command.setCtx({
+                strokeStyle: '#000000',
+                lineWidth: 2
+            });
+            lareq.command.beginPath();
+            lareq.command.moveTo({ x: faceX + 15, y: faceY + 35 });
+            lareq.command.lineTo({ x: faceX + 20, y: faceY + 30 });
+            lareq.command.lineTo({ x: faceX + 30, y: faceY + 30 });
+            lareq.command.lineTo({ x: faceX + 35, y: faceY + 35 });
+            lareq.command.stroke();
+        }
+        
+        // Полоса здоровья
+        const healthBarWidth = width / 3;
+        const healthBarHeight = 20;
+        const healthBarX = faceX - healthBarWidth - 10;
+        const healthBarY = viewportHeight + 20;
+        
+        // Фон полосы здоровья
+        lareq.command.setCtx({
+            fillStyle: '#3A3A3A',
+            strokeStyle: '#777777',
+            lineWidth: 2
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: healthBarX, y: healthBarY });
+        lareq.command.lineTo({ x: healthBarX + healthBarWidth, y: healthBarY });
+        lareq.command.lineTo({ x: healthBarX + healthBarWidth, y: healthBarY + healthBarHeight });
+        lareq.command.lineTo({ x: healthBarX, y: healthBarY + healthBarHeight });
+        lareq.command.closePath();
+        lareq.command.fill();
+        lareq.command.stroke();
+        
+        // Полоса здоровья
+        const healthPercent = playerHealth / 100;
+        const healthFillWidth = healthBarWidth * healthPercent;
+        
+        // Цвет зависит от количества здоровья
+        let healthColor;
+        if (playerHealth > 60) healthColor = '#00FF00'; // Зеленый
+        else if (playerHealth > 30) healthColor = '#FFFF00'; // Желтый
+        else healthColor = '#FF0000'; // Красный
+        
+        lareq.command.setCtx({
+            fillStyle: healthColor
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: healthBarX, y: healthBarY });
+        lareq.command.lineTo({ x: healthBarX + healthFillWidth, y: healthBarY });
+        lareq.command.lineTo({ x: healthBarX + healthFillWidth, y: healthBarY + healthBarHeight });
+        lareq.command.lineTo({ x: healthBarX, y: healthBarY + healthBarHeight });
+        lareq.command.closePath();
+        lareq.command.fill();
+        
+        // Текст "HEALTH"
+        lareq.command.setCtx({
+            font: '14px Arial',
+            fillStyle: '#FFFFFF',
+            textAlign: 'center',
+            textBaseline: 'middle'
+        });
+        lareq.command.fillText({
+            text: `ЗДОРОВЬЕ ${playerHealth}%`,
+            x: healthBarX + healthBarWidth / 2,
+            y: healthBarY + healthBarHeight / 2,
+            maxWidth: healthBarWidth
+        });
+        
+        // Полоса боеприпасов
+        const ammoBarWidth = width / 3;
+        const ammoBarHeight = 20;
+        const ammoBarX = faceX + faceSize + 10;
+        const ammoBarY = viewportHeight + 20;
+        
+        // Фон полосы боеприпасов
+        lareq.command.setCtx({
+            fillStyle: '#3A3A3A',
+            strokeStyle: '#777777',
+            lineWidth: 2
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: ammoBarX, y: ammoBarY });
+        lareq.command.lineTo({ x: ammoBarX + ammoBarWidth, y: ammoBarY });
+        lareq.command.lineTo({ x: ammoBarX + ammoBarWidth, y: ammoBarY + ammoBarHeight });
+        lareq.command.lineTo({ x: ammoBarX, y: ammoBarY + ammoBarHeight });
+        lareq.command.closePath();
+        lareq.command.fill();
+        lareq.command.stroke();
+        
+        // Полоса боеприпасов
+        const maxAmmo = 100; // Максимум боеприпасов
+        const ammoPercent = ammo / maxAmmo;
+        const ammoFillWidth = ammoBarWidth * ammoPercent;
+        
+        lareq.command.setCtx({
+            fillStyle: '#3D629A' // Синий для боеприпасов
+        });
+        lareq.command.beginPath();
+        lareq.command.moveTo({ x: ammoBarX, y: ammoBarY });
+        lareq.command.lineTo({ x: ammoBarX + ammoFillWidth, y: ammoBarY });
+        lareq.command.lineTo({ x: ammoBarX + ammoFillWidth, y: ammoBarY + ammoBarHeight });
+        lareq.command.lineTo({ x: ammoBarX, y: ammoBarY + ammoBarHeight });
+        lareq.command.closePath();
+        lareq.command.fill();
+        
+        // Текст "AMMO"
+        lareq.command.setCtx({
+            font: '14px Arial',
+            fillStyle: '#FFFFFF',
+            textAlign: 'center',
+            textBaseline: 'middle'
+        });
+        lareq.command.fillText({
+            text: `ПАТРОНЫ ${ammo}`,
+            x: ammoBarX + ammoBarWidth / 2,
+            y: ammoBarY + ammoBarHeight / 2,
+            maxWidth: ammoBarWidth
+        });
     }
     
     // Расчет яркости в зависимости от дистанции

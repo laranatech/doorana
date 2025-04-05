@@ -14,14 +14,15 @@ export class RendererUtils {
     const cameraX = camera.getPosition().x
     const cameraZ = camera.getPosition().z
 
+    const angleSin = Math.sin(angle)
+    const angleCos = Math.cos(angle)
+
     while (distance < this.MAX_DEPTH) {
-        ray = new Vector3(
-            Math.sin(angle) * distance,
-            0,
-            Math.cos(angle) * distance
-        )
-        const worldPosX = cameraX + ray.x
-        const worldPosZ = cameraZ + ray.z
+        const rayX = angleSin * distance
+        const rayZ = angleCos * distance
+
+        const worldPosX = cameraX + rayX
+        const worldPosZ = cameraZ + rayZ
         const coordX = Math.floor(worldPosX)
         const coordZ = Math.floor(worldPosZ)
         

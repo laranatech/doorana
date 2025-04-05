@@ -10,6 +10,15 @@ interface Door {
     isOpen: boolean; // Открыта ли дверь
 }
 
+export interface Map {
+    getWidth(): number;
+    getHeight(): number;
+    getCell(x: number, y: number): string;
+    getWallType(x: number, y: number): string;
+    isWall(x: number, y: number): boolean;
+    tryOpenDoor(x: number, y: number): boolean;
+}
+
 export class Map {
     private map: string[][]
     private playerPosition: { x: number, y: number }
@@ -95,6 +104,17 @@ export class Map {
         }
     }
 
+    isTransparentWall(x: number, y: number): boolean {
+        return this.map[y][x] === 'D' || this.map[y][x] === 'L'
+    }
+
+    isSolid(x: number, y: number): boolean {
+        if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
+            return true
+        }
+        return this.map[y][x] === '#'
+    }
+
     isWall(x: number, y: number): boolean {
         if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
             return true
@@ -165,6 +185,21 @@ export class Map {
 
     // Проверка на тип стены - обычная, дверь или запертая дверь
     getWallType(x: number, y: number): string {
+        if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
+            return '#'; // За пределами карты - обычная стена
+        }
+        return this.map[y][x];
+    }
+
+    getWidth(): number {
+        return this.map[0].length;
+    }
+
+    getHeight(): number {
+        return this.map.length;
+    }
+
+    getCell(x: number, y: number): string {
         if (x < 0 || y < 0 || x >= this.map[0].length || y >= this.map.length) {
             return '#'; // За пределами карты - обычная стена
         }

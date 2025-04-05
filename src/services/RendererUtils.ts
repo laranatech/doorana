@@ -4,9 +4,11 @@ import { Map } from "./Map"
 export class RendererUtils {
   private readonly MAX_DEPTH: number = 24 // Максимальная видимая дистанция
   
-  public castRay(camera: Camera, map: Map, angle: number, maxDepth: number = this.MAX_DEPTH): { distance: number, hitWall: boolean } {
+  public castRay(camera: Camera, map: Map, angle: number, baseDepth: number = 0,maxDepth: number = this.MAX_DEPTH): { 
+    distance: number, hitWall: boolean, transparent?: boolean, depth?: number 
+  } {
     let ray = new Vector3(0, 0, 0)
-    let distance = 0
+    let distance = baseDepth
     const step = 0.01 // Уменьшаем шаг для более точного определения столкновений
     
     while (distance < maxDepth) {
@@ -20,9 +22,12 @@ export class RendererUtils {
             camera.getPosition().y + ray.y,
             camera.getPosition().z + ray.z
         )
+        if (map.isTransparentWall(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
+            return { distance, hitWall: false }
+        }
         
-        if (map.isWall(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
-            return { distance, hitWall: true }
+        if (map.isSolid(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
+          return { distance, hitWall: true }
         }
         distance += step
     }

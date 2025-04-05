@@ -100,78 +100,58 @@ export class Renderer {
         const fov = Math.PI / 3
         const rayStep = fov / this.RAY_COUNT
         const startAngle = camera.getRotation() - fov / 2
-        const renderTag = Math.random()
         
-        // Рендеринг стен с повышенной точностью
+        let baseDepth = 0
         for (let i = 0; i < this.RAY_COUNT; i++) {
             const rayAngle = startAngle + rayStep * i
-            const { distance, hitWall } = this.utils.castRay(camera, map, rayAngle)
+            const { distance, hitWall, transparent, depth } = this.utils.castRay(camera, map, rayAngle, baseDepth)
             
-            // Сохраняем расстояние в Z-буфере
+            if (!hitWall) continue;
             zBuffer[i] = hitWall ? distance : Infinity
             
-            if (!hitWall) {
-                continue;
-            }
-
-            // Вычисляем высоту стены с учетом эффекта "рыбий глаз"
-            // Корректируем проекцию, чтобы избавиться от искажения "рыбий глаз"
             const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
             const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
             const wallTop = (height - wallHeight) / 2
             const wallBottom = wallTop + wallHeight
             
-            // Применяем эффект тумана/затемнения с расстоянием
-            const brightness = this.utils.calculateBrightness(correctedDistance);
+            const brightness = this.utils.calculateBrightness(correctedDistance)
             
-            // Добавляем псевдотекстуру стены с помощью эффекта смены оттенков
-            // в зависимости от позиции на стене
-            let wallColor;
+            const worldPosX = camera.getPosition().x + Math.sin(rayAngle) * distance
+            const worldPosZ = camera.getPosition().z + Math.cos(rayAngle) * distance
+            const xOffset = worldPosX - Math.floor(worldPosX)
+            const zOffset = worldPosZ - Math.floor(worldPosZ)
             
-            // Меняем цвет в зависимости от четности клетки для создания эффекта кирпичей
-            const worldPosX = camera.getPosition().x + Math.sin(rayAngle) * distance;
-            const worldPosZ = camera.getPosition().z + Math.cos(rayAngle) * distance;
-            const xOffset = worldPosX - Math.floor(worldPosX);
-            const zOffset = worldPosZ - Math.floor(worldPosZ);
+            const wallType = map.getWallType(Math.floor(worldPosX), Math.floor(worldPosZ))
             
-            // Проверяем тип стены (обычная, дверь или запертая дверь)
-            const wallType = map.getWallType(Math.floor(worldPosX), Math.floor(worldPosZ));
+            let wallSide = ''
+            const EPSILON = 0.01
             
-            // Определяем, по какой стороне клетки был удар (север, юг, восток, запад)
-            let wallSide = '';
-            const EPSILON = 0.01;
+            if (xOffset < EPSILON) wallSide = 'west'
+            else if (xOffset > 1 - EPSILON) wallSide = 'east'
+            else if (zOffset < EPSILON) wallSide = 'north'
+            else if (zOffset > 1 - EPSILON) wallSide = 'south'
             
-            if (xOffset < EPSILON) wallSide = 'west';
-            else if (xOffset > 1 - EPSILON) wallSide = 'east';
-            else if (zOffset < EPSILON) wallSide = 'north';
-            else if (zOffset > 1 - EPSILON) wallSide = 'south';
-            
-            // Выбираем цвет стены в зависимости от стороны света и типа стены
-            let baseWallColor;
+            let baseWallColor
             
             if (wallType === 'D' || wallType === 'L') {
                 const doorHeight = this.doorAnimationService.getDoorHeight(
                     Math.floor(worldPosX),
                     Math.floor(worldPosZ)
                 )
-                if (doorHeight < 1) {
-                    console.log(doorHeight)
-                }
                 
-                // Если дверь анимируется, корректируем высоту стены
                 if (doorHeight < 1) {
+                    // Рисуем дверь с анимацией сверху вниз
                     const adjustedWallHeight = wallHeight * doorHeight
                     const adjustedWallTop = (height - adjustedWallHeight) / 2
                     const adjustedWallBottom = adjustedWallTop + adjustedWallHeight
                     
-                    // Рисуем дверь с учетом анимации
                     if (wallType === 'D') {
-                        baseWallColor = '#A0522D'; // Коричневый для дверей
+                        baseWallColor = '#A0522D'
                     } else {
-                        baseWallColor = '#8B4513'; // Темно-коричневый для запертых дверей
+                        baseWallColor = '#8B4513'
                     }
                     
-                    wallColor = this.utils.applyBrightness(baseWallColor, brightness);
+                    const wallColor = this.utils.applyBrightness(baseWallColor, brightness)
                     
                     lareq.command.setCtx({
                         fillStyle: wallColor
@@ -183,9 +163,12 @@ export class Renderer {
                     lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: adjustedWallBottom })
                     lareq.command.closePath()
                     lareq.command.fill()
-                    continue;
+                    continue
                 }
             }
+            
+            // Выбираем цвет стены в зависимости от стороны света и типа стены
+            let wallColor;
             
             if (wallType === 'D') { // Обычная дверь
                 baseWallColor = '#A0522D'; // Коричневый для дверей
@@ -214,6 +197,13 @@ export class Renderer {
             lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
             lareq.command.closePath()
             lareq.command.fill()
+
+            if (transparent) {
+                i--
+                baseDepth = depth!
+            } else {
+                baseDepth = 0
+            }
         }
     }
 

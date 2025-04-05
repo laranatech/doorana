@@ -30,8 +30,8 @@ export class Game {
 		// Инициализация служб игры
 		this.map = new Map()
 		this.spriteManager = new SpriteManager()
-		this.collisionService = new CollisionService(this.map)
 		this.doorAnimationService = new DoorAnimationService()
+		this.collisionService = new CollisionService(this.map, this.doorAnimationService)
 		this.combatService = new CombatService(this.spriteManager)
 		
 		// Настройка камеры

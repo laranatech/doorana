@@ -8,6 +8,7 @@ interface AnimatedDoor {
     currentHeight: number;
     targetHeight: number;
     speed: number;
+    isOpen: boolean;
 }
 
 export class DoorAnimationService {
@@ -24,7 +25,8 @@ export class DoorAnimationService {
             isClosing: false,
             currentHeight: 1,
             targetHeight: 0,
-            speed: this.ANIMATION_SPEED
+            speed: this.ANIMATION_SPEED,
+            isOpen: false
         });
     }
 
@@ -35,13 +37,13 @@ export class DoorAnimationService {
                 door.currentHeight = Math.max(0, door.currentHeight - door.speed * deltaTime);
                 if (door.currentHeight <= 0) {
                     door.isOpening = false;
-                    this.animatedDoors.delete(key);
+                    door.isOpen = true;
                 }
             } else if (door.isClosing) {
                 door.currentHeight = Math.min(1, door.currentHeight + door.speed * deltaTime);
                 if (door.currentHeight >= 1) {
                     door.isClosing = false;
-                    this.animatedDoors.delete(key);
+                    door.isOpen = false;
                 }
             }
         }
@@ -51,9 +53,6 @@ export class DoorAnimationService {
     getDoorHeight(x: number, y: number): number {
         const key = `${x},${y}`;
         const door = this.animatedDoors.get(key);
-        if (this.animatedDoors.size > 0) {
-            console.log(door)
-        }
         return door ? door.currentHeight : 1;
     }
 
@@ -61,5 +60,12 @@ export class DoorAnimationService {
     isDoorAnimating(x: number, y: number): boolean {
         const key = `${x},${y}`;
         return this.animatedDoors.has(key);
+    }
+
+    // Проверяем, открыта ли дверь
+    isDoorOpen(x: number, y: number): boolean {
+        const key = `${x},${y}`;
+        const door = this.animatedDoors.get(key);
+        return door ? door.isOpen : false;
     }
 } 

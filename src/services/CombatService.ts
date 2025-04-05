@@ -1,7 +1,9 @@
 import { Vector3 } from './Vector3'
 import { SpriteManager } from './SpriteManager'
+import { Sprite } from './SpriteManager'
 
 interface Enemy {
+    sprite: Sprite;
     position: Vector3;
     health: number;
     isDead: boolean;
@@ -16,10 +18,11 @@ export class CombatService {
     constructor(private spriteManager: SpriteManager) {}
 
     // Добавляем врага
-    addEnemy(position: Vector3) {
-        const key = `${position.x},${position.z}`;
+    addEnemy(enemy: Sprite) {
+        const key = `${enemy.position.x},${enemy.position.z}`;
         this.enemies.set(key, {
-            position,
+            sprite: enemy,
+            position: enemy.position,
             health: this.ENEMY_HEALTH,
             isDead: false
         });
@@ -53,11 +56,7 @@ export class CombatService {
                     console.log('hitEnemy', enemy)
                     enemy.isDead = true;
                     // Удаляем спрайт врага
-                    this.spriteManager.removeSprite({
-                        position: enemy.position,
-                        texture: 'enemy',
-                        type: 'enemy'
-                    });
+                    this.spriteManager.removeSprite(enemy.sprite);
                 }
             }
         }

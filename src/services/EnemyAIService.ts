@@ -2,9 +2,10 @@ import { Vector3 } from './Vector3'
 import { Map as GameMap } from './Map'
 import { CollisionService } from './CollisionService'
 import { CombatService } from './CombatService'
-import { SpriteManager } from './SpriteManager'
+import { SpriteManager, Sprite } from './SpriteManager'
 
 interface EnemyState {
+    sprite: Sprite;
     position: Vector3;
     targetPosition: Vector3 | null;
     state: 'idle' | 'chasing' | 'attacking';
@@ -32,10 +33,11 @@ export class EnemyAIService {
     ) {}
 
     // Добавляем врага
-    addEnemy(position: Vector3) {
-        const key = `${position.x},${position.z}`;
+    addEnemy(enemy: Sprite) {
+        const key = `${enemy.position.x},${enemy.position.z}`;
         this.enemies.set(key, {
-            position,
+            sprite: enemy,
+            position: enemy.position,
             targetPosition: null,
             state: 'idle',
             lastSeenPlayerTime: 0,

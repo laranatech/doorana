@@ -55,15 +55,10 @@ export class Game {
 			this.spriteManager.addSprite(item)
 			// Если это враг, добавляем его в CombatService
 			if (item.texture === 'enemy') {
-				this.combatService.addEnemy(item.position)
-				this.enemyAIService.addEnemy(item.position)
+				this.combatService.addEnemy(item)
+				this.enemyAIService.addEnemy(item)
 			}
 		})
-		
-		// Добавляем тестовый спрайт если предметов нет
-		if (this.spriteManager.getSprites().length === 0) {
-			this.addTestSprite()
-		}
 		
 		// Обработка нажатия клавиш
 		window.addEventListener('keydown', (e) => {
@@ -85,25 +80,13 @@ export class Game {
 		const deltaTime = currentTime - this.lastTime
 		this.lastTime = currentTime
 		
-		// Обновляем состояние камеры
 		this.camera.update(deltaTime)
-		
-		// Обновляем анимацию дверей
 		this.doorAnimationService.update(deltaTime)
-		
-		// Обновляем AI врагов
 		this.enemyAIService.update(deltaTime, this.camera.getPosition())
-		
-		// Обрабатываем движение на основе нажатых клавиш
 		this.handleMovement()
-		
-		// Проверяем взаимодействия
 		this.checkInteractions()
-		
-		// Рендерим кадр
 		this.render()
 		
-		// Запрашиваем следующий кадр
 		requestAnimationFrame(this.gameLoop.bind(this))
 	}
 
@@ -146,18 +129,6 @@ export class Game {
 		if (this.keysPressed.has('arrowright')) {
 			this.camera.startRotatingRight()
 		}
-	}
-	
-	// Добавление тестового спрайта для проверки отображения
-	private addTestSprite() {
-		const playerPos = this.map.getPlayerPosition()
-		// Добавляем спрайт противника перед игроком
-		const enemyPos = new Vector3(playerPos.x + 2, 0, playerPos.y + 2)
-		this.spriteManager.addSprite({
-			position: enemyPos,
-			texture: 'enemy',
-			type: 'enemy'
-		})
 	}
 
 	// Проверка взаимодействий с предметами при движении
@@ -291,7 +262,6 @@ export class Game {
 		this.playerHealth = Math.max(0, this.playerHealth - amount)
 		if (this.playerHealth <= 0) {
 			this.showMessageOnScreen('Игра окончена!')
-			// TODO: Добавить экран смерти
 		} else {
 			this.showMessageOnScreen(`Получен урон! Здоровье: ${this.playerHealth}`)
 		}

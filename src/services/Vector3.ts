@@ -5,6 +5,20 @@ export class Vector3 {
         public z: number
     ) {}
 
+    length(): number {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+
+    normalize(): Vector3 {
+        const len = this.length();
+        if (len === 0) return new Vector3(0, 0, 0);
+        return new Vector3(this.x / len, this.y / len, this.z / len);
+    }
+
+    multiply(scalar: number): Vector3 {
+        return new Vector3(this.x * scalar, this.y * scalar, this.z * scalar);
+    }
+
     rotateY(angle: number): Vector3 {
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);

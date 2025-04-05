@@ -5,8 +5,8 @@ interface AnimatedDoor {
     y: number;
     isOpening: boolean;
     isClosing: boolean;
-    currentHeight: number;
-    targetHeight: number;
+    currentOffset: number; // Смещение двери от 0 до 1
+    targetOffset: number;
     speed: number;
     isOpen: boolean;
 }
@@ -23,8 +23,8 @@ export class DoorAnimationService {
             y,
             isOpening: true,
             isClosing: false,
-            currentHeight: 1,
-            targetHeight: 0,
+            currentOffset: 0,
+            targetOffset: 1,
             speed: this.ANIMATION_SPEED,
             isOpen: false
         });
@@ -34,14 +34,14 @@ export class DoorAnimationService {
     update(deltaTime: number) {
         for (const [key, door] of this.animatedDoors) {
             if (door.isOpening) {
-                door.currentHeight = Math.max(0, door.currentHeight - door.speed * deltaTime);
-                if (door.currentHeight <= 0) {
+                door.currentOffset = Math.min(1, door.currentOffset + door.speed * deltaTime);
+                if (door.currentOffset >= 1) {
                     door.isOpening = false;
                     door.isOpen = true;
                 }
             } else if (door.isClosing) {
-                door.currentHeight = Math.min(1, door.currentHeight + door.speed * deltaTime);
-                if (door.currentHeight >= 1) {
+                door.currentOffset = Math.max(0, door.currentOffset - door.speed * deltaTime);
+                if (door.currentOffset <= 0) {
                     door.isClosing = false;
                     door.isOpen = false;
                 }
@@ -49,11 +49,11 @@ export class DoorAnimationService {
         }
     }
 
-    // Получаем текущую высоту двери
-    getDoorHeight(x: number, y: number): number {
+    // Получаем текущее смещение двери
+    getDoorOffset(x: number, y: number): number {
         const key = `${x},${y}`;
         const door = this.animatedDoors.get(key);
-        return door ? door.currentHeight : 1;
+        return door ? door.currentOffset : 0;
     }
 
     // Проверяем, анимируется ли дверь

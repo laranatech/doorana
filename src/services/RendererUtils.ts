@@ -1,17 +1,18 @@
 import { Camera } from "./Camera"
 import { Vector3 } from "./Vector3"
 import { Map } from "./Map"
+import { DoorAnimationService } from "./DoorAnimationService"
 export class RendererUtils {
   private readonly MAX_DEPTH: number = 24 // Максимальная видимая дистанция
   
-  public castRay(camera: Camera, map: Map, angle: number, baseDepth: number = 0,maxDepth: number = this.MAX_DEPTH): { 
-    distance: number, hitWall: boolean, transparent?: boolean, depth?: number 
+  public castRay(camera: Camera, map: Map, angle: number, doorAnimationService: DoorAnimationService): { 
+    distance: number, hitWall: boolean
   } {
     let ray = new Vector3(0, 0, 0)
-    let distance = baseDepth
+    let distance = 0
     const step = 0.01 // Уменьшаем шаг для более точного определения столкновений
     
-    while (distance < maxDepth) {
+    while (distance < this.MAX_DEPTH) {
         ray = new Vector3(
             Math.sin(angle) * distance,
             0,
@@ -22,16 +23,22 @@ export class RendererUtils {
             camera.getPosition().y + ray.y,
             camera.getPosition().z + ray.z
         )
-        if (map.isTransparentWall(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
-            return { distance, hitWall: false }
+        const coordX = Math.floor(worldPos.x)
+        const coordZ = Math.floor(worldPos.z)
+        if (map.isTransparentWall(coordX, coordZ)) {
+          if (doorAnimationService.isDoorAnimating(coordX, coordZ)) {
+            distance += step
+            continue
+          }
+          return { distance, hitWall: true }
         }
         
-        if (map.isSolid(Math.floor(worldPos.x), Math.floor(worldPos.z))) {
+        if (map.isSolid(coordX, coordZ)) {
           return { distance, hitWall: true }
         }
         distance += step
     }
-    return { distance: maxDepth, hitWall: false }
+    return { distance: this.MAX_DEPTH, hitWall: false }
   }
 
   // Расчет яркости в зависимости от дистанции

@@ -101,10 +101,9 @@ export class Renderer {
         const rayStep = fov / this.RAY_COUNT
         const startAngle = camera.getRotation() - fov / 2
         
-        let baseDepth = 0
         for (let i = 0; i < this.RAY_COUNT; i++) {
             const rayAngle = startAngle + rayStep * i
-            const { distance, hitWall, transparent, depth } = this.utils.castRay(camera, map, rayAngle, baseDepth)
+            const { distance, hitWall } = this.utils.castRay(camera, map, rayAngle, this.doorAnimationService)
             
             if (!hitWall) continue;
             zBuffer[i] = hitWall ? distance : Infinity
@@ -134,16 +133,15 @@ export class Renderer {
             let baseWallColor
             
             if (wallType === 'D' || wallType === 'L') {
-                const doorHeight = this.doorAnimationService.getDoorHeight(
+                const doorOffset = this.doorAnimationService.getDoorOffset(
                     Math.floor(worldPosX),
                     Math.floor(worldPosZ)
                 )
                 
-                if (doorHeight < 1) {
-                    // Рисуем дверь с анимацией сверху вниз
-                    const adjustedWallHeight = wallHeight * doorHeight
-                    const adjustedWallTop = (height - adjustedWallHeight) / 2
-                    const adjustedWallBottom = adjustedWallTop + adjustedWallHeight
+                if (doorOffset < 1) {
+                    // Рисуем дверь с анимацией слева направо
+                    const doorWidth = (width / this.RAY_COUNT) * (1 - doorOffset)
+                    const doorX = (width * i) / this.RAY_COUNT
                     
                     if (wallType === 'D') {
                         baseWallColor = '#A0522D'
@@ -157,10 +155,10 @@ export class Renderer {
                         fillStyle: wallColor
                     })
                     lareq.command.beginPath()
-                    lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: adjustedWallTop })
-                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: adjustedWallTop })
-                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: adjustedWallBottom })
-                    lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: adjustedWallBottom })
+                    lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
+                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
+                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
+                    lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
                     lareq.command.closePath()
                     lareq.command.fill()
                     continue
@@ -197,13 +195,6 @@ export class Renderer {
             lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
             lareq.command.closePath()
             lareq.command.fill()
-
-            if (transparent) {
-                i--
-                baseDepth = depth!
-            } else {
-                baseDepth = 0
-            }
         }
     }
 

@@ -27,6 +27,7 @@ export class Game {
 	enemyAIService: EnemyAIService
 	damageThrottle: boolean = true
 
+	started: boolean = false
 	bfgTick: number = 0;
 
 	constructor(renderer: CanvasRenderer) {
@@ -80,6 +81,10 @@ export class Game {
 	}
 	
 	gameLoop(currentTime: number) {
+		if (!this.started) {
+			return;
+		}
+
 		const deltaTime = currentTime - this.lastTime
 		this.lastTime = currentTime
 
@@ -94,6 +99,14 @@ export class Game {
 	}
 
 	handleKeyDown(key: string) {
+		console.log(key)
+		if (!this.started) {
+			if (key.toLowerCase() === 'e')
+			this.started = true;
+			requestAnimationFrame(this.gameLoop.bind(this))
+			return;
+		}
+
 		switch (key.toLowerCase()) {
 			case 'e': case 'у':
 				this.tryOpenDoor()
@@ -268,6 +281,10 @@ export class Game {
 	}
 
 	render() {
+		if (!this.started) {
+			this.gameRenderer.renderSplash();
+			return;
+		}
 		// Получаем список спрайтов для отображения
 		const sprites = this.spriteManager.getSprites().map(sprite => ({
 			position: sprite.position,

@@ -2,7 +2,9 @@ import { CanvasRenderer } from '@laranatech/colorana'
 import { Game } from './game'
 
 const renderer = new CanvasRenderer({
-	preloadImages: [],
+	preloadImages: [
+		'/doorana.webp',
+	],
 })
 
 const game = new Game(renderer)

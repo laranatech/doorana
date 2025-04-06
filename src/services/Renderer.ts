@@ -57,8 +57,32 @@ export class Renderer {
             console.log('[Renderer Debug]', ...args);
         }
     }
+
+    renderSplash() {
+        if (!this.renderer.canvas) {
+            return
+        }
+
+        const lareq = new RenderQueue()
+        this.renderer.canvas.width = window.innerWidth
+        this.renderer.canvas.height = window.innerHeight
+
+        lareq.command.drawImage({
+            img: './doorana.webp',
+            x: 0,
+            y: 0,
+            w: this.renderer.canvas?.width || 0,
+            h: this.renderer.canvas?.height || 0,
+        })
+
+        this.renderer.prepare(lareq.commands);
+        this.renderer.render(lareq.commands);
+    }
     
     render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '', playerHealth: number = 100, ammo: number = 50, bfgTick: number = 0) {
+        if (!this.renderer.canvas) {
+            return;
+        }
         const lareq = new RenderQueue()
         const width = this.renderer.canvas!.width
         const height = this.renderer.canvas!.height

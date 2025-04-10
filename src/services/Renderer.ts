@@ -1,5 +1,5 @@
 import { CanvasRenderer } from '@laranatech/colorana'
-import { RenderCommand, RenderQueue } from '@laranatech/lareq'
+import { RenderQueue } from '@laranatech/lareq'
 import { Camera } from './Camera'
 import { Vector3 } from './Vector3'
 import { Map } from './Map'
@@ -57,8 +57,32 @@ export class Renderer {
             console.log('[Renderer Debug]', ...args);
         }
     }
+
+    renderSplash() {
+        if (!this.renderer.canvas) {
+            return
+        }
+
+        const lareq = new RenderQueue()
+        this.renderer.canvas.width = window.innerWidth
+        this.renderer.canvas.height = window.innerHeight
+
+        lareq.command.drawImage({
+            img: './doorana.webp',
+            x: 0,
+            y: 0,
+            w: this.renderer.canvas?.width || 0,
+            h: this.renderer.canvas?.height || 0,
+        })
+
+        this.renderer.prepare(lareq.commands);
+        this.renderer.render(lareq.commands);
+    }
     
-    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '', playerHealth: number = 100, ammo: number = 50) {
+    render(camera: Camera, map: Map, sprites: {position: Vector3, texture: string}[] = [], message: string = '', playerHealth: number = 100, ammo: number = 50, bfgTick: number = 0) {
+        if (!this.renderer.canvas) {
+            return;
+        }
         const lareq = new RenderQueue()
         const width = this.renderer.canvas!.width
         const height = this.renderer.canvas!.height
@@ -87,7 +111,7 @@ export class Renderer {
         }
         
         // Рисуем нижнюю панель в стиле DOOM
-        this.doomPanel.drawDoomPanel(lareq, width, height, viewportHeight, playerHealth, ammo);
+        this.doomPanel.drawDoomPanel(lareq, width, height, viewportHeight, playerHealth, ammo, bfgTick);
         
         this.renderer.prepare(lareq.commands);
         this.renderer.render(lareq.commands);
@@ -108,7 +132,6 @@ export class Renderer {
             const correctedDistance = distance * Math.cos(rayAngle - camera.getRotation())
             const wallHeight = (height / correctedDistance) * this.WALL_HEIGHT
             const wallTop = (height - wallHeight) / 2
-            const wallBottom = wallTop + wallHeight
             
             const brightness = this.utils.calculateBrightness(correctedDistance)
             
@@ -143,16 +166,20 @@ export class Renderer {
                     }
                     
                     const wallColor = this.utils.applyBrightness(baseWallColor, brightness)
+
+                    const a = (width * i) / this.RAY_COUNT;
+                    const b = (width * (i + 1)) / this.RAY_COUNT;
                     
                     lareq.command.setCtx({
                         fillStyle: wallColor
                     })
                     lareq.command.beginPath()
-                    lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
-                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
-                    lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
-                    lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
-                    lareq.command.closePath()
+                    lareq.command.rect({
+                        x: a,
+                        y: wallTop,
+                        w: b - a,
+                        h: wallHeight,
+                    })
                     lareq.command.fill()
                     continue
                 }
@@ -176,17 +203,21 @@ export class Renderer {
             }
             
             wallColor = this.utils.applyBrightness(baseWallColor, brightness);
+
+            const a = (width * i) / this.RAY_COUNT;
+            const b = (width * (i + 1)) / this.RAY_COUNT;
             
             // Рисуем стену
             lareq.command.setCtx({
                 fillStyle: wallColor
             })
             lareq.command.beginPath()
-            lareq.command.moveTo({ x: (width * i) / this.RAY_COUNT, y: wallTop })
-            lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallTop })
-            lareq.command.lineTo({ x: (width * (i + 1)) / this.RAY_COUNT, y: wallBottom })
-            lareq.command.lineTo({ x: (width * i) / this.RAY_COUNT, y: wallBottom })
-            lareq.command.closePath()
+            lareq.command.rect({
+                x: a,
+                y: wallTop,
+                w: b - a,
+                h: wallHeight,
+            })
             lareq.command.fill()
         }
     }
@@ -212,6 +243,12 @@ export class Renderer {
                 fillStyle: floorColor
             })
             lareq.command.beginPath()
+            // lareq.command.rect({
+            //     x: 0,
+            //     y: yStart,
+            //     w: 0,
+            //     h: 0,
+            // })
             lareq.command.moveTo({ x: 0, y: yStart })
             lareq.command.lineTo({ x: width, y: yStart })
             lareq.command.lineTo({ x: width, y: yEnd })
@@ -385,11 +422,12 @@ export class Renderer {
                 
                 // Рисуем только эту колонку спрайта
                 lareq.command.beginPath();
-                lareq.command.moveTo({ x: colX, y: spriteY - spriteHeight / 2 });
-                lareq.command.lineTo({ x: colX + columnWidth, y: spriteY - spriteHeight / 2 });
-                lareq.command.lineTo({ x: colX + columnWidth, y: spriteY + spriteHeight / 2 });
-                lareq.command.lineTo({ x: colX, y: spriteY + spriteHeight / 2 });
-                lareq.command.closePath();
+                lareq.command.rect({
+                    x: colX,
+                    y: spriteY - spriteHeight / 2,
+                    w: columnWidth,
+                    h: spriteHeight,
+                })
                 lareq.command.fill();
             }
         });

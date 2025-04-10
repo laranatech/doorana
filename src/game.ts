@@ -26,6 +26,10 @@ export class Game {
 	keysPressed: Set<string> = new Set()
 	enemyAIService: EnemyAIService
 	damageThrottle: boolean = true
+
+	started: boolean = false
+	bfgTick: number = 0;
+
 	constructor(renderer: CanvasRenderer) {
 		this.renderer = renderer
 		
@@ -77,20 +81,32 @@ export class Game {
 	}
 	
 	gameLoop(currentTime: number) {
+		if (!this.started) {
+			return;
+		}
+
 		const deltaTime = currentTime - this.lastTime
 		this.lastTime = currentTime
-		
+
 		this.camera.update(deltaTime)
 		this.doorAnimationService.update(deltaTime)
 		this.enemyAIService.update(deltaTime, this.camera.getPosition())
 		this.handleMovement()
 		this.checkInteractions()
 		this.render()
-		
+
 		requestAnimationFrame(this.gameLoop.bind(this))
 	}
 
 	handleKeyDown(key: string) {
+		console.log(key)
+		if (!this.started) {
+			if (key.toLowerCase() === 'e')
+			this.started = true;
+			requestAnimationFrame(this.gameLoop.bind(this))
+			return;
+		}
+
 		switch (key.toLowerCase()) {
 			case 'e': case 'у':
 				this.tryOpenDoor()
@@ -178,13 +194,32 @@ export class Game {
 			}
 		}
 	}
-	
+
+	private tickBfg() {
+		this.bfgTick += 1;
+
+		if (this.bfgTick > 5) {
+			this.bfgTick = 0;
+			return;
+		}
+
+		setTimeout(() => {
+			this.tickBfg();
+		}, 100)
+	}
+
 	// Обработка выстрела
 	private shoot() {
+		if (this.bfgTick !== 0) {
+			return;
+		}
+
 		if (this.playerAmmo <= 0) {
 			this.showMessageOnScreen('Нет патронов!')
 			return
 		}
+
+		this.tickBfg()
 
 		this.playerAmmo--
 		const hitEnemy = this.combatService.shoot(
@@ -246,6 +281,10 @@ export class Game {
 	}
 
 	render() {
+		if (!this.started) {
+			this.gameRenderer.renderSplash();
+			return;
+		}
 		// Получаем список спрайтов для отображения
 		const sprites = this.spriteManager.getSprites().map(sprite => ({
 			position: sprite.position,
@@ -259,7 +298,8 @@ export class Game {
 			sprites, 
 			this.showMessage,
 			this.playerHealth,
-			this.playerAmmo
+			this.playerAmmo,
+			this.bfgTick
 		)
 	}
 
